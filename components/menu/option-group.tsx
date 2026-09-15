@@ -27,7 +27,6 @@ export default function OptionGroup({
 
   return (
     <div className={[
-      'border-t border-[#F0F0F0]',
       isMissing ? 'border-l-[3px] border-l-[#C92A2A]' : '',
       groupSoldOut ? 'opacity-50' : '',
     ].join(' ')}>
@@ -70,7 +69,7 @@ export default function OptionGroup({
             } else if (item.plus > 0) {
               priceLabel = `+${formatWon(item.plus)}`
             } else if (item.plus === 0 && !showFinalPrice) {
-              priceLabel = '포함'
+              priceLabel = isSoldOut ? '품절' : '포함'
             }
           }
 
@@ -116,10 +115,9 @@ export default function OptionGroup({
                 <span className={[
                   'text-[14px]',
                   isSelected ? 'font-semibold text-[#1E1E1E]' : 'text-[#1E1E1E]',
-                  isSoldOut ? 'line-through text-[#727272]' : '',
+                  isSoldOut ? 'text-[#ABABAB]' : '',
                 ].join(' ')}>
                   {displayName}
-                  {isSoldOut && <span className="ml-2 text-[11px] text-[#727272]">품절</span>}
                 </span>
               </div>
 

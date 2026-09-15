@@ -3,7 +3,7 @@
 :root {
   --green: #017333;
   --green-soft: #E6F4EC;
-  --ink: #1E1E1E;
+  --ink: #222222;
   --gray-text: #727272;
   --gray-border: #D7D7D7;
   --gray-bg: #FAFAFA;
@@ -15,7 +15,7 @@
 @theme inline {
   --color-green: #017333;
   --color-green-soft: #E6F4EC;
-  --color-ink: #1E1E1E;
+  --color-ink: #222222;
   --color-gray-text: #727272;
   --color-gray-border: #D7D7D7;
   --color-gray-bg: #FAFAFA;

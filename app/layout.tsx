@@ -13,7 +13,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
       </head>
-      <body className="min-h-full" style={{ backgroundColor: '#222222' }}>
+      <body className="min-h-full" style={{ backgroundColor: '#E5E5E5' }}>
         <FirebaseInit />
         {children}
       </body>

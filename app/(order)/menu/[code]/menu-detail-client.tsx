@@ -165,9 +165,9 @@ export default function MenuDetailClient({ code }: { code: string }) {
             onClick={() => router.back()}
             className="-ml-3 p-3 z-10"
           >
-            <svg width="9" height="15" viewBox="0 0 9 15" fill="none"><path d="M8 1L1 7.5L8 14" stroke="#1E1E1E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <svg width="9" height="15" viewBox="0 0 9 15" fill="none"><path d="M8 1L1 7.5L8 14" stroke="#222222" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </button>
-          <span className="absolute inset-0 flex items-center justify-center text-[15px] font-bold text-[#1E1E1E] pointer-events-none">
+          <span className="absolute inset-0 flex items-center justify-center text-[15px] font-bold text-[#222222] pointer-events-none">
             메뉴 선택
           </span>
         </div>
@@ -209,17 +209,17 @@ export default function MenuDetailClient({ code }: { code: string }) {
               {menu.isNew       && <span style={{ backgroundColor: '#1D6FE8', color: 'white' }} className="inline-block text-[13px] font-bold px-[8px] py-[2px] rounded-full">신메뉴</span>}
             </div>
           )}
-          <h1 className="text-[20px] font-[800] text-[#1E1E1E] mb-1">{menu.name}</h1>
+          <h1 className="text-[20px] font-[800] text-[#222222] mb-1">{menu.name}</h1>
           <p className="text-[13px] text-[#727272] leading-relaxed">{menu.desc}</p>
-          <p className="text-[18px] font-bold text-[#1E1E1E] mt-3">{formatWon(menu.price)}</p>
+          <p className="text-[18px] font-bold text-[#222222] mt-3">{formatWon(menu.price)}</p>
         </div>
 
         <div className="flex items-center justify-between px-5 py-4 border-t border-[#F0F0F0]">
-          <span className="text-[16px] font-semibold text-[#1E1E1E]">{formatWon(menu.price)}</span>
+          <span className="text-[16px] font-semibold text-[#222222]">{formatWon(menu.price)}</span>
           <div className="flex items-center gap-4">
             <button
               onClick={() => { const next = Math.max(1, qty - 1); if (next !== qty) { track('quantity_change', { menu_name: menu.name, direction: 'down', new_qty: next }); ampTrack('quantity_change', { menu_name: menu.name, direction: 'down', new_qty: next }) } setQty(q => Math.max(1, q - 1)) }}
-              className="w-9 h-9 rounded-full border border-[#D7D7D7] flex items-center justify-center text-[18px] text-[#1E1E1E]"
+              className="w-9 h-9 rounded-full border border-[#D7D7D7] flex items-center justify-center text-[18px] text-[#222222]"
               disabled={qty <= 1}
             >
               −
@@ -227,7 +227,7 @@ export default function MenuDetailClient({ code }: { code: string }) {
             <span className="text-[16px] font-bold w-6 text-center">{qty}</span>
             <button
               onClick={() => { track('quantity_change', { menu_name: menu.name, direction: 'up', new_qty: qty + 1 }); ampTrack('quantity_change', { menu_name: menu.name, direction: 'up', new_qty: qty + 1 }); setQty(q => q + 1) }}
-              className="w-9 h-9 rounded-full border border-[#D7D7D7] flex items-center justify-center text-[18px] text-[#1E1E1E]"
+              className="w-9 h-9 rounded-full border border-[#D7D7D7] flex items-center justify-center text-[18px] text-[#222222]"
             >
               +
             </button>
@@ -260,14 +260,15 @@ export default function MenuDetailClient({ code }: { code: string }) {
 
       {/* ── 하단 고정 영역 ── */}
       <div
-        className="fixed bottom-0 left-0 right-0 bg-white px-5 py-4 z-10"
+        className="fixed bottom-0 left-0 right-0 bg-white px-5 py-3 z-10 flex items-center justify-between gap-4"
         style={{ maxWidth: '430px', margin: '0 auto', boxShadow: '0 -4px 20px rgba(0,0,0,0.08)' }}
       >
+        {/* 왼쪽: 선결제 잔액 */}
         {account && (
-          <div className="flex items-center justify-between mb-3 text-[12px]">
-            <span className="text-[#727272]">선결제 잔액</span>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[11px] text-[#727272]">선결제 잔액</span>
             <span className={[
-              'font-bold',
+              'text-[16px] font-bold',
               account.balance < 0 ? 'text-[#C92A2A]' : account.balance < 30000 ? 'text-[#C92A2A]' : 'text-[#017333]',
             ].join(' ')}>
               {formatWon(account.balance)}
@@ -275,12 +276,13 @@ export default function MenuDetailClient({ code }: { code: string }) {
           </div>
         )}
 
+        {/* 오른쪽: 담기 버튼 */}
         <button
           onClick={handleAddToCart}
-          className="w-full py-[17px] bg-[#1E1E1E] text-white rounded-xl text-base font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform"
+          className="flex-shrink-0 py-[12px] px-7 bg-[#222222] text-white rounded-xl font-bold flex items-center gap-1.5 active:scale-95 transition-transform"
         >
-          <span>{editCartId ? '변경하기' : '담기'}</span>
-          <span className="font-bold">{formatWon(subtotal)}</span>
+          <span className="text-[15px]">{editCartId ? '변경하기' : '담기'}</span>
+          <span className="text-[16px]">{formatWon(subtotal)}</span>
         </button>
       </div>
     </div>

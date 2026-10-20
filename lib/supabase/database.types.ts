@@ -883,6 +883,26 @@ export type Database = {
       }
     }
     Functions: {
+      store_closed_reason: {
+        Args: { p_store_id: string }
+        Returns: { reason: string; reopen_at: string | null }[]
+      }
+      recent_menus_for_orderer: {
+        Args: {
+          p_account_code: string
+          p_orderer_name?: string | null
+          p_limit?: number
+        }
+        Returns: {
+          menu_id: string
+          name: string
+          base_price: number
+          image_url: string | null
+          category_id: string
+          times: number
+          last_ordered_at: string
+        }[]
+      }
       add_deposit:
         | {
             Args: {

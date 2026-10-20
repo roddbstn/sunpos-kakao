@@ -18,13 +18,15 @@ export default function MenuCard({ menu, onClick }: MenuCardProps) {
         if (!isSoldOut && (e.key === 'Enter' || e.key === ' ')) onClick()
       }}
       className={[
-        'flex flex-row-reverse gap-[14px] py-[14px] cursor-pointer',
+        'flex flex-row-reverse gap-[14px] py-[14px] px-2 -mx-2 rounded-xl cursor-pointer',
+        'transition-[background-color,transform] duration-150 hover:bg-gray-bg active:bg-gray-bg',
+        'active:scale-[0.97]',
         isSoldOut ? 'pointer-events-none opacity-50' : '',
       ].join(' ')}
     >
       {/* 이미지 썸네일 */}
       <div className="relative flex-shrink-0 w-[88px] h-[88px]">
-        <div className="w-[88px] h-[88px] bg-[#F5F5F5] rounded-xl overflow-hidden flex items-center justify-center text-[38px]">
+        <div className="w-[88px] h-[88px] bg-[#F2F2F2] rounded-xl overflow-hidden flex items-center justify-center text-[38px]">
           {menu.imageUrl
             ? <img src={menu.imageUrl} alt={menu.name} className="w-full h-full object-cover" />
             : menu.emoji

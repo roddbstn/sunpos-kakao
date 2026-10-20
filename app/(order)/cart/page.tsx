@@ -9,6 +9,7 @@ import CartSummary from '@/components/cart/CartSummary'
 import { formatWon } from '@/lib/utils'
 import { track } from '@/lib/firebase'
 import { ampTrack } from '@/lib/amplitude'
+import ScreenHeader from '@/components/ui/screen-header'
 
 export default function CartPage() {
   const router = useRouter()
@@ -70,19 +71,7 @@ export default function CartPage() {
 
   return (
     <div className="screen">
-      {/* Header */}
-      <header className="flex items-center h-14 px-5 border-b border-[#D7D7D7] flex-shrink-0">
-        <button
-          onClick={() => router.back()}
-          className="-ml-3 p-3 rounded-full hover:bg-[#F5F5F5] transition-colors"
-          aria-label="뒤로가기"
-        >
-          <svg width="9" height="15" viewBox="0 0 9 15" fill="none"><path d="M8 1L1 7.5L8 14" stroke="#222222" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-        </button>
-        <h1 className="flex-1 text-center text-base font-bold text-[#222222] pr-9">
-          장바구니
-        </h1>
-      </header>
+      <ScreenHeader title="장바구니" onBack={() => router.back()} />
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto px-4 pb-4">
@@ -92,7 +81,7 @@ export default function CartPage() {
             <p className="text-sm">장바구니가 비어있어요.</p>
             <button
               onClick={() => { track('cart_empty_go_menu'); ampTrack('cart_empty_go_menu'); router.push('/menu') }}
-              className="mt-5 px-6 py-3 bg-[#017333] text-white text-sm font-bold rounded-xl active:opacity-80 transition-opacity"
+              className="mt-5 px-6 py-3 bg-[#2C261F] text-white text-sm font-bold rounded-xl active:opacity-80 transition-opacity"
             >
               메뉴 보러가기
             </button>
@@ -133,21 +122,15 @@ export default function CartPage() {
 
       {/* Footer */}
       <footer className="flex-shrink-0 px-4 py-4 border-t border-[#D7D7D7] bg-white shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
-        {account && (
-          <div className="flex items-center justify-between mb-3 text-sm">
-            <span className="font-semibold text-[#222222]">{account.name}</span>
-            <span
-              className={`font-semibold ${currentBalance < 0 ? 'text-[#C92A2A]' : 'text-[#017333]'}`}
-            >
-              잔액 {formatWon(currentBalance)}
-            </span>
-          </div>
-        )}
+        <div className="flex items-baseline justify-between mb-3">
+          <span className="text-sm text-[#727272]">총 금액</span>
+          <span className="text-[17px] font-bold text-[#1E1E1E] tabular-nums">{formatWon(total)}</span>
+        </div>
         <button
           onClick={handleConfirm}
           disabled={isDisabled}
-          className={`w-full py-4 rounded-xl font-bold text-white text-base transition-colors ${
-            isDisabled ? 'bg-[#CCC] cursor-not-allowed' : 'bg-[#222222] active:scale-95'
+          className={`w-full py-4 rounded-xl font-bold text-base transition-colors ${
+            isDisabled ? 'bg-[#CCC] text-[#1E1E1E] cursor-not-allowed' : 'bg-[#2C261F] text-white active:scale-95'
           }`}
         >
           확인

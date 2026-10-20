@@ -15,10 +15,38 @@ export interface Account {
   org: string | null     // 기관명
   balance: number        // 현재잔액 (정수, 원)
   contactPhone?: string | null  // 거래처 연락처 (개인 주문 시 영수증 전화번호로 사용)
-  pin: string            // 4자리 PIN (mock only — real: server-side)
+  pin?: string           // 4자리 PIN (레거시 — 카카오 전환 후 미사용)
   storeId?: string       // 소속 스토어 ID
   storeName?: string     // 스토어명
   isDemo?: boolean       // 데모 모드 — 실제 주문 RPC 호출 안 함
+}
+
+// 카카오 OAuth 사용자 정보
+export interface KakaoUser {
+  id: string             // Supabase auth.users.id (UUID)
+  kakaoId: string        // 카카오 고유 ID
+  nickname: string       // 카카오 닉네임
+  profileImage?: string  // 카카오 프로필 이미지 URL
+  phone?: string         // 카카오 계정 전화번호 (있는 경우)
+}
+
+// 사용자 ↔ 거래처 연결 (user_account_links 행)
+export interface ActiveLink {
+  linkId: string
+  accountCode: string
+  storeId: string
+  role: '관리자' | '이용자'
+  status: 'pending' | 'approved' | 'rejected'
+  orgName?: string
+}
+
+// 매장 기본 정보
+export interface StoreInfo {
+  id: string
+  name: string
+  address: string
+  isOpen: boolean
+  coverImagePath?: string | null
 }
 
 export interface MenuOptionItem {

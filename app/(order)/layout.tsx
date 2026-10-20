@@ -5,7 +5,7 @@ export default function OrderLayout({ children }: { children: React.ReactNode })
   return (
     <div className="min-h-screen flex justify-center" style={{ backgroundColor: '#E5E5E5' }}>
       <div
-        className="w-full max-w-[430px] min-h-screen bg-white relative"
+        className="w-full max-w-[430px] min-h-screen bg-surface relative"
         style={{ paddingTop: 'env(safe-area-inset-top)' }}
       >
         <SessionExpiry />

@@ -3,16 +3,22 @@
 import { useState, useEffect, useRef, useCallback, Suspense, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useSessionStore } from '@/lib/store/session'
+import RecentMenus from '@/components/menu/recent-menus'
 import { useCartStore } from '@/lib/store/cart'
 import { getSupabaseClient } from '@/lib/supabase/client'
-import { formatWon } from '@/lib/utils'
+import { formatWon, isLowBalance, isNegativeBalance, shortRoadAddress } from '@/lib/utils'
 import MenuCard from '@/components/menu/menu-card'
 import { track } from '@/lib/firebase'
 import { ampTrack } from '@/lib/amplitude'
+import { personProps } from '@/lib/person-key'
 import MenuDetailClient from './[code]/menu-detail-client'
 import type { Category, Menu } from '@/lib/types'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { mapDbMenu } from '@/lib/mappers'
+import LoadingTimer from '@/components/ui/loading-timer'
+import KakaoLoginButton from '@/components/KakaoLoginButton'
+import SelfRegisterSheet from '@/components/SelfRegisterSheet'
+import { getSessionUser, getSunposProfile, getUserStoreLinks, getSunposAddresses } from '@/lib/auth'
 
 export default function MenuPage() {
   return (
@@ -27,9 +33,83 @@ function MenuPageInner() {
   const searchParams = useSearchParams()
   const selectedItemCode = searchParams.get('item')
   const account = useSessionStore(s => s.account)
+
+  // ── 사람 확인 ───────────────────────────────────────────────────────────
+  // PIN 은 '계정'을 열어줄 뿐 '누가' 쓰는지는 모른다. 메뉴는 보여주되,
+  // 주문하려면 카카오 로그인 → 이름·전화번호·배달 장소까지 받아야 한다.
+  //   미로그인      → 하단 CTA 가 카카오 로그인 버튼
+  //   로그인·미등록 → 하단 시트로 정보 입력
+  //   둘 다 끝      → 평소대로 장바구니 바
+  const [authState, setAuthState] = useState<'checking' | 'anon' | 'unregistered' | 'ready'>('checking')
+  const [kakaoNick, setKakaoNick] = useState('')
+  const [myName,    setMyName]    = useState('')
+  const [myPhone,   setMyPhone]   = useState('')
+  const [loginBusy, setLoginBusy] = useState(false)
+
+  useEffect(() => {
+    let alive = true
+    void (async () => {
+      const user = await getSessionUser()
+      if (!alive) return
+      if (!user) { setAuthState('anon'); return }
+      setKakaoNick(user.nickname ?? '')
+      const profile = await getSunposProfile()
+      if (!alive) return
+
+      // ⚠️ 등록 여부는 **계정별**이다.
+      // 전엔 sunpos_users.phone 만 보고 판단했는데, 그건 사람 단위 프로필이라
+      // A계정에 등록한 사람이 B계정 QR 로 들어와도 'ready' 가 됐다. 그래서 톱니가
+      // 보이고, 설정 화면은 계정별 링크를 확인하니 "이 계정의 이용자가 아니에요"로
+      // 거부했다 — 들어온 사람 입장에선 로그인은 됐는데 설정만 막히는 모양이었다.
+      const links = account?.storeId
+        ? await getUserStoreLinks(account.storeId).catch(() => [])
+        : []
+      if (!alive) return
+      const linked = links.some(l => l.account_code === account?.code && l.status === 'approved')
+
+      if (profile?.phone && linked) {
+        const nm = profile.nickname || user.nickname || ''
+        setMyName(nm)
+        // 세션에도 넣어둔다. 주문 확인 화면은 세션의 orderer/phone 을 미리 채우는데,
+        // QR→PIN→카카오 흐름에는 이 값을 넣어주는 자리가 없어서 저장해둔 연락처가
+        // 있는데도 빈 칸으로 떴다.
+        useSessionStore.getState().setPhone(profile.phone)
+        if (nm) useSessionStore.getState().setOrderer(nm)
+        setAuthState('ready')
+      } else {
+        // 프로필이 이미 있으면 시트에 미리 채워 한 번만 확인하면 되게 한다
+        setMyName(profile?.nickname || user.nickname || '')
+        setMyPhone(profile?.phone ?? '')
+        setAuthState('unregistered')
+      }
+    })()
+    return () => { alive = false }
+    // account 는 sessionStorage 복원 뒤에야 채워진다. deps 가 비어 있으면 복원 전에
+    // 한 번 돌고 끝나서 storeId 가 없는 채로 '미등록'으로 굳는다.
+  }, [account?.code, account?.storeId])
+
+  async function handleKakaoLogin() {
+    setLoginBusy(true)
+    const supabase = getSupabaseClient()
+    // 로그인 뒤 메뉴로 돌아온다 — 거기서 하단 시트가 뜬다
+    await supabase.auth.signInWithOAuth({
+      provider: 'kakao',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback/?next=/menu`,
+        scopes: 'account_email profile_nickname profile_image',
+      },
+    })
+    setLoginBusy(false)
+  }
+  const activeLink = useSessionStore(s => s.activeLink)
   const orderer = useSessionStore(s => s.orderer)
+  // 분석에 실을 사람. 카카오 로그인 이용자는 세션의 orderer 가 비어 있고 본인 이름은
+  // myName 에 있다 — personProps(logOrderer) 만 쓰면 그 사람들의 클릭이 전부 orderer_key
+  // 없이 쌓여서 사람별 분해에서 통째로 빠진다. 지난주문 목록을 받는 기준과 같게 맞춘다.
+  const logOrderer = myName || orderer
   const cartItems = useCartStore(s => s.items)
 
+  const [lastDeliveryAddress, setLastDeliveryAddress] = useState<{ roadAddress: string; detailAddress: string | null } | null>(null)
   const [categories, setCategories] = useState<Category[]>([])
   const [menus, setMenus] = useState<Menu[]>([])
   const [loading, setLoading] = useState(true)
@@ -120,6 +200,18 @@ function MenuPageInner() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [account?.code])
 
+  // 현재 배달받는 곳 — 이 거래처에서 가장 최근에 배달 주문했던 주소를 매장명 위에 보여준다
+  useEffect(() => {
+    if (!account?.code) return
+    let cancelled = false
+    // 맨 위에 저장된 주소가 '현재 배달 주소'다. 전엔 마지막 **주문**의 주소를 썼는데,
+    // 설정에서 주소를 바꿔도 다음 주문 전까진 옛 주소가 계속 떠 있었다.
+    getSunposAddresses()
+      .then(list => { if (!cancelled) setLastDeliveryAddress(list[0] ?? null) })
+      .catch(() => { if (!cancelled) setLastDeliveryAddress(null) })
+    return () => { cancelled = true }
+  }, [account?.code])
+
   // DB에서 카테고리 + 메뉴 로딩
   useEffect(() => {
     if (!account) return
@@ -142,7 +234,7 @@ function MenuPageInner() {
           return
         }
 
-        const cats: Category[] = catData.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))
+        const cats: Category[] = catData.map((c) => ({ id: c.id, name: c.name }))
         setCategories(cats)
         setActiveCategory(cats[0].id)
 
@@ -332,13 +424,13 @@ function MenuPageInner() {
   if (!hydrated) return null
   if (!account) {
     return (
-      <div className="flex flex-col min-h-screen bg-white">
+      <div className="flex flex-col min-h-screen bg-surface">
         <div className="flex-1 flex flex-col items-center justify-center px-8 text-center">
           <p className="text-[16px] font-semibold text-[#222222] mb-2">세션이 만료되었습니다</p>
           <p className="text-[13px] text-[#727272]">QR 코드를 다시 스캔해 주세요.</p>
         </div>
         <div className="px-5 pb-10 pt-4">
-          <a href="/" className="block w-full py-4 rounded-2xl bg-[#222222] text-white text-[15px] font-bold text-center">
+          <a href="/" className="block w-full py-4 rounded-2xl bg-[#2C261F] text-white text-[15px] font-bold text-center">
             처음으로
           </a>
         </div>
@@ -348,16 +440,15 @@ function MenuPageInner() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-white">
-        <div className="w-8 h-8 border-4 border-[#017333] border-t-transparent rounded-full animate-spin mb-3" />
-        <p className="text-[14px] text-[#727272]">메뉴를 불러오는 중...</p>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-surface">
+        <LoadingTimer size={44} />
       </div>
     )
   }
 
   if (fetchError) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen px-8 text-center bg-white gap-3">
+      <div className="flex flex-col items-center justify-center min-h-screen px-8 text-center bg-surface gap-3">
         <p className="text-[16px] font-semibold text-[#222222]">메뉴를 불러오지 못했습니다</p>
         <p className="text-[13px] text-[#727272]">네트워크 상태를 확인하고 다시 시도해주세요.</p>
         <button
@@ -373,7 +464,7 @@ function MenuPageInner() {
   return (
     // fixed + centered: 430px 안에서 뷰포트 전체 높이를 점유 → sticky/overflow 동작 유지
     <div
-      className="fixed top-0 bottom-0 w-full max-w-[430px] flex flex-col bg-white"
+      className="fixed top-0 bottom-0 w-full max-w-[430px] flex flex-col bg-surface"
       style={{ left: '50%', transform: 'translateX(-50%)', paddingTop: 'env(safe-area-inset-top)' }}
     >
 
@@ -381,19 +472,53 @@ function MenuPageInner() {
       <div className="flex-1 overflow-y-auto" ref={scrollRef}>
 
         {/* 헤더 (스크롤 시 사라짐) */}
-        <div className="bg-white pt-14 px-6 pb-0">
-          <h1 className="text-[26px] font-bold text-[#222222]">{account.storeName ?? ''}</h1>
+        <div className="bg-surface pt-14 px-6 pb-0">
+          {/* 현재 배달 주소 — 상단 가운데. 시/도·시군구는 떼고 도로명부터만 보여준다.
+              같은 동네 안에서는 앞부분이 전부 같아서 구분에 쓸모가 없고 줄만 길어진다. */}
+          {lastDeliveryAddress && (
+            <div className="flex items-center justify-center gap-1 mb-2">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#727272" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0Z" />
+                <circle cx="12" cy="10" r="3" />
+              </svg>
+              <span className="text-[12px] font-light text-[#1E1E1E] truncate">
+                {shortRoadAddress(lastDeliveryAddress.roadAddress)}
+              </span>
+            </div>
+          )}
+          <div className="flex items-center justify-between">
+            <h1 className="text-[26px] font-bold text-[#222222]">{account.storeName ?? ''}</h1>
+            {authState === 'ready' && (
+              <button
+                onClick={() => router.push(`/settings/${account.code}`)}
+                aria-label="설정"
+                /* -mr-2 를 뺐다. 아이콘만 있을 땐 여백을 당겨 시각 보정하는 게 맞았지만,
+                   회색 박스가 생기면서 그 가장자리가 아래 잔액 박스보다 8px 밖으로
+                   튀어나왔다. 면이 보이는 요소는 컨테이너 패딩에 맞춰야 한다. */
+                className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-50 active:bg-[#E8E4E2] active:scale-95 transition-all duration-100"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1E1E1E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 0 1 1.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 0 1-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 0 1-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.505-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.108-1.204l-.526-.738a1.125 1.125 0 0 1 .12-1.45l.773-.773a1.125 1.125 0 0 1 1.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894Z" />
+                  <path d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                </svg>
+              </button>
+            )}
+          </div>
 
-          <div className="mt-3 mb-4 bg-[#F5F5F5] rounded-xl px-4 py-3 flex items-center justify-between">
-            <span className="text-[13px] text-[#727272]">
-              <span className="text-[15px] font-semibold text-[#222222]">{account.name}</span>
-              {orderer && <span className="ml-1 text-[#727272]">· {orderer}</span>}
+          <div className={`mt-3 mb-4 rounded-xl px-4 py-3 flex items-center justify-between ${
+            isNegativeBalance(account.balance) ? 'bg-[#FFF0F0]' : 'bg-gray-50'
+          }`}>
+            <span className="text-[13px] font-light text-[#1E1E1E]">
+              {/* 거래처명도 주문자명과 같은 13px 회색. 강조는 오른쪽 잔액 하나로 몰아준다 —
+                  왼쪽에서 굵게 세워두면 "여기도 봐야 하나" 싶어 시선이 둘로 갈린다. */}
+              <span>{account.name}</span>
+              {(myName || orderer) && <span className="ml-1">· {myName || orderer}</span>}
             </span>
             <div className="text-right">
-              <div className="text-[13px] text-[#727272]">선결제 잔액</div>
+              <div className="text-[13px] font-light text-ink">선결제 잔액</div>
               <div className={[
-                'text-[16px] font-bold',
-                account.balance < 30000 ? 'text-[#C92A2A]' : 'text-[#017333]',
+                'text-[13px] font-bold',
+                isLowBalance(account.balance) ? 'text-danger' : 'text-ink',
               ].join(' ')}>
                 {formatWon(account.balance)}
               </div>
@@ -402,7 +527,7 @@ function MenuPageInner() {
         </div>
 
         {/* 카테고리 탭 (sticky — 내부 컨테이너 기준으로 동작) */}
-        <div className="sticky top-0 z-10 bg-white" style={{ position: 'sticky' }}>
+        <div className="sticky top-0 z-10 bg-surface" style={{ position: 'sticky' }}>
           <div className="flex items-center">
             <div
               ref={tabsRef}
@@ -419,7 +544,7 @@ function MenuPageInner() {
                     'rounded-[27.5px]',
                     activeCategory === cat.id
                       ? 'bg-[#222222] text-white'
-                      : 'bg-[#FAFAFA] text-[#727272]',
+                      : 'bg-gray-bg text-gray-text',
                   ].join(' ')}
                 >
                   {cat.name}
@@ -453,18 +578,59 @@ function MenuPageInner() {
           />
         </div>
 
+        {/* 지난 주문 — 카테고리 탭 바로 아래.
+            카카오 로그인 상태면 RPC 가 auth.uid() 로 본인 주문을 찾고,
+            아직 uid 로 쌓인 주문이 없으면 주문자명으로 떨어진다. */}
+        {account?.code && (
+          <RecentMenus
+            accountCode={account.code}
+            ordererName={logOrderer}
+            // 아직 자기 정보를 안 낸 사람(로그인 전·등록 전)에게는 이 매장의 실제
+            // 메뉴로 만든 예시를 보여준다. 빈 줄로 두면 이 기능이 있는 줄도 모른다.
+            demoPool={authState === 'ready' ? undefined : menus}
+            onShown={count => {
+              track('recent_menus_shown', { count })
+              ampTrack('recent_menus_shown', { count })
+            }}
+            onPick={(menuId, meta) => {
+              // Menu.code 가 곧 menus.id 다 (lib/mappers.ts: code = row.id)
+              const menu = menus.find(m => m.code === menuId)
+              if (!menu) return
+              const payload = {
+                menu_name: menu.name, menu_code: menu.code,
+                rank: meta.rank,          // 지난주문 줄에서 몇 번째 카드였나
+                times: meta.times,        // 그 사람이 몇 번 시킨 메뉴인가
+                is_top: meta.isTop,       // '가장 많이 주문함' 뱃지가 달린 카드였나
+                source: 'recent',
+                ...personProps(logOrderer),
+              }
+              track('recent_menu_click', payload)
+              ampTrack('recent_menu_click', payload)
+              // 뱃지 달린 카드를 고른 경우는 따로도 한 번 — 퍼널에서 바로 분모/분자로 쓰려고
+              if (meta.isTop) {
+                track('recent_menu_top_click', payload)
+                ampTrack('recent_menu_top_click', payload)
+              }
+              router.push(`/menu?item=${menu.code}`)
+            }}
+          />
+        )}
+
         {/* 메뉴 목록 */}
         <div className="pb-[100px]">
-          {categories.map(cat => {
+          {categories.filter(c => menusByCat(c.id).length > 0).map((cat, i) => {
             const catMenus = menusByCat(cat.id)
-            if (catMenus.length === 0) return null
 
             return (
               <div key={cat.id}>
+                {/* 카테고리 사이를 가르는 바. **첫 카테고리 위에는 긋지 않는다** —
+                    바로 위가 카테고리 탭이라, 거기에 바가 붙으면 탭이 회색 띠를
+                    깔고 앉은 것처럼 보인다. 스크롤 위치 계산에 ref 가 필요하므로
+                    엘리먼트는 남기고 높이·배경만 없앤다. */}
                 <div
                   ref={el => { sectionRefs.current[cat.id] = el }}
                   data-cat={cat.id}
-                  className="h-2 bg-[#F5F5F5] mt-2"
+                  className={i === 0 ? 'h-0' : 'h-2 bg-gray-50 mt-2'}
                 />
                 <div className="px-5 pt-5 pb-1">
                   <h2 className="text-[20px] font-bold text-[#222222]">{cat.name}</h2>
@@ -507,7 +673,11 @@ function MenuPageInner() {
 
       {/* 검색 플로팅 버튼 */}
       <button
-        onClick={() => { ampTrack('search_open'); setSearchQuery(''); setSearchOpen(true) }}
+        onClick={() => {
+          const p = personProps(logOrderer)
+          track('search_open', p); ampTrack('search_open', p)
+          setSearchQuery(''); setSearchOpen(true)
+        }}
         className="fixed right-5 z-20 w-10 h-10 bg-[#222222] text-white rounded-full shadow-lg flex items-center justify-center"
         style={{ bottom: qty > 0 ? '100px' : '20px' }}
         aria-label="메뉴 검색"
@@ -537,7 +707,7 @@ function MenuPageInner() {
                     'whitespace-nowrap py-2 px-3 text-[12px] font-semibold rounded-xl transition-colors',
                     activeCategory === cat.id
                       ? 'bg-[#222222] text-white'
-                      : 'bg-[#F5F5F5] text-[#727272]',
+                      : 'bg-gray-bg text-gray-text',
                   ].join(' ')}
                 >
                   {cat.name}
@@ -548,21 +718,37 @@ function MenuPageInner() {
         </div>
       )}
 
-      {/* 장바구니 바 */}
-      {qty > 0 && (
+      {/* ── 하단 바 ──
+          로그인 전에는 **메뉴를 보되 주문은 못 한다.** 장바구니 바 대신 카카오 로그인이
+          그 자리를 차지한다 — 담아놓고 결제 직전에 로그인하라고 하면, 고른 걸 잃을까 봐
+          뒤로 못 가는 상태에서 로그인을 강요받는 꼴이 된다. */}
+      {authState === 'anon' ? (
+        <div className="flex-shrink-0 px-5 py-4 bg-white" style={{ boxShadow: '0 -4px 20px rgba(0,0,0,0.08)' }}>
+          <KakaoLoginButton onClick={handleKakaoLogin} loading={loginBusy} />
+        </div>
+      ) : qty > 0 && (
         <div
           className="flex-shrink-0 px-5 py-4 bg-white"
           style={{ boxShadow: '0 -4px 20px rgba(0,0,0,0.08)' }}
         >
           <button
             onClick={() => { track('cart_bar_click', { item_count: qty }); ampTrack('cart_bar_click', { item_count: qty }); router.push('/cart') }}
-            className="w-full py-[16px] bg-[#222222] text-white rounded-xl font-bold text-[15px] flex items-center justify-between px-5"
+            className="w-full py-[16px] bg-[#2C261F] text-white rounded-xl font-bold text-[15px] flex items-center justify-between px-5"
           >
-            <span className="bg-white/20 rounded-lg px-2 py-0.5 text-[13px]">{qty}개</span>
+            <span className="bg-black/10 rounded-lg px-2 py-0.5 text-[13px]">{qty}개</span>
             <span>장바구니 보기</span>
             <span>{formatWon(subtotal)}</span>
           </button>
         </div>
+      )}
+
+      {/* 로그인은 했는데 아직 자기 정보를 안 낸 사람 — 메뉴를 가리고 받는다 */}
+      {authState === 'unregistered' && account?.code && (
+        <SelfRegisterSheet
+          accountCode={account.code}
+          defaultName={kakaoNick}
+          onDone={name => { setMyName(name); setAuthState('ready') }}
+        />
       )}
 
       {/* ── 검색 모달 ── */}
@@ -600,7 +786,7 @@ function MenuPageInner() {
 
             {/* 검색 입력 */}
             <div className="px-5 pb-3">
-              <div className="flex items-center gap-2 bg-[#F5F5F5] rounded-xl px-4 py-3">
+              <div className="flex items-center gap-2 bg-[#F2F2F2] rounded-xl px-4 py-3">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#727272" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
                 </svg>
@@ -608,7 +794,18 @@ function MenuPageInner() {
                   ref={searchInputRef}
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  onFocus={() => ampTrack('search_field_focus')}
+                  onFocus={() => {
+                    const p = personProps(logOrderer)
+                    track('search_field_focus', p); ampTrack('search_field_focus', p)
+                  }}
+                  onKeyDown={e => {
+                    // 엔터 = "찾아달라"는 분명한 의사표시. 글자를 치다 만 것과 구분된다.
+                    if (e.key !== 'Enter') return
+                    const q = searchQuery.trim()
+                    if (!q) return
+                    const p = { query: q, query_len: q.length, ...personProps(logOrderer) }
+                    track('search_submit', p); ampTrack('search_submit', p)
+                  }}
                   placeholder="메뉴 이름을 입력하세요"
                   className="flex-1 bg-transparent outline-none text-[15px] text-[#222222] placeholder:text-[#727272]"
                 />
@@ -625,7 +822,7 @@ function MenuPageInner() {
 
               {/* 카테고리 탭 sticky */}
               {searchCategories.length > 0 && (
-                <div className="sticky top-0 z-10 bg-white" style={{ position: 'sticky' }}>
+                <div className="sticky top-0 z-10 bg-surface" style={{ position: 'sticky' }}>
                   <div className="flex items-center">
                     <div
                       ref={searchTabsRef}
@@ -641,7 +838,7 @@ function MenuPageInner() {
                             'flex-shrink-0 px-[18px] py-[9px] text-[14px] font-semibold transition-colors rounded-[27.5px]',
                             searchActiveCategory === cat.id
                               ? 'bg-[#222222] text-white'
-                              : 'bg-[#FAFAFA] text-[#727272]',
+                              : 'bg-gray-bg text-gray-text',
                           ].join(' ')}
                         >
                           {cat.name}
@@ -673,19 +870,24 @@ function MenuPageInner() {
                     <div key={cat.id}>
                       <div
                         ref={el => { searchSectionRefs.current[cat.id] = el }}
-                        className="h-2 bg-[#F5F5F5] mt-2"
+                        className="h-2 bg-gray-50 mt-2"
                       />
                       <div className="px-5 pt-5 pb-1">
                         <h2 className="text-[20px] font-bold text-[#222222]">{cat.name}</h2>
                       </div>
                       <div className="px-5">
-                        {searchResults.filter(m => m.cat === cat.id).map(menu => (
+                        {searchResults.filter(m => m.cat === cat.id).map((menu, si) => (
                           <MenuCard
                             key={menu.code}
                             menu={menu}
                             onClick={() => {
-                              track('search_menu_click', { menu_name: menu.name, query: searchQuery.trim() })
-                              ampTrack('search_menu_click', { menu_name: menu.name, query: searchQuery.trim() })
+                              const sp = {
+                                menu_name: menu.name, menu_code: menu.code,
+                                query: searchQuery.trim(), rank: si + 1,
+                                ...personProps(logOrderer),
+                              }
+                              track('search_menu_click', sp)
+                              ampTrack('search_menu_click', sp)
                               setSearchOpen(false)
                               router.push(`/menu?item=${menu.code}`)
                             }}
@@ -735,7 +937,7 @@ function MenuPageInner() {
                           'whitespace-nowrap py-2 px-3 text-[12px] font-semibold rounded-xl transition-colors',
                           searchActiveCategory === cat.id
                             ? 'bg-[#222222] text-white'
-                            : 'bg-[#F5F5F5] text-[#727272]',
+                            : 'bg-gray-bg text-gray-text',
                         ].join(' ')}
                       >
                         {cat.name}

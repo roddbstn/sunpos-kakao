@@ -30,22 +30,29 @@ export default function OptionGroup({
       isMissing ? 'border-l-[3px] border-l-[#C92A2A]' : '',
       groupSoldOut ? 'opacity-50' : '',
     ].join(' ')}>
-      {/* 그룹 헤더 */}
-      <div className="flex items-center gap-2 px-5 py-3">
-        <span className="text-[14px] font-bold text-[#1E1E1E]">{group.group}</span>
+      {/* 그룹 헤더 — 좌우로 꽉 찬 아주 연한 바로 감싼다.
+          옵션이 여러 그룹일 때 어디서 그룹이 바뀌는지 글자 굵기만으로는 안 보였다.
+          높이는 글자 줄 높이(약 22px)의 두 배보다 조금 더 — 바가 얇으면 글자가
+          바에 끼인 것처럼 보인다. */}
+      <div className="flex items-center justify-between px-5 bg-[#F5F5F5] h-[54px] mt-[14px]">
+        {/* 필수는 '필수' 뱃지 대신 **옵션명 바로 옆 주황 별표**로.
+            뱃지로 띄우면 눈이 이름 → 뱃지로 한 번 더 건너가는데,
+            별표는 이름을 읽는 그 자리에서 같이 읽힌다. */}
+        <span className="text-[16px] font-bold text-[#1E1E1E]">
+          {group.group}
+          {!groupSoldOut && group.required && (
+            <span className="text-[#FF8418] ml-[3px]" aria-label="필수 선택">*</span>
+          )}
+        </span>
         {groupSoldOut ? (
           <span className="text-[11px] font-semibold text-white bg-[#727272] px-[7px] py-[2px] rounded-full">
             품절
           </span>
-        ) : group.required ? (
-          <span className="text-[11px] font-semibold text-[#C92A2A] bg-[#FFF0F0] px-[7px] py-[2px] rounded-full">
-            필수
-          </span>
-        ) : (
-          <span className="text-[11px] font-semibold text-[#727272] bg-[#F5F5F5] px-[7px] py-[2px] rounded-full">
+        ) : !group.required ? (
+          <span className="text-[11px] font-normal uppercase tracking-wide text-[#727272]">
             {group.multi ? '복수선택' : '선택'}
           </span>
-        )}
+        ) : null}
       </div>
 
       {/* 옵션 아이템 목록 */}
@@ -68,8 +75,8 @@ export default function OptionGroup({
               priceLabel = formatWon(basePrice + item.plus)
             } else if (item.plus > 0) {
               priceLabel = `+${formatWon(item.plus)}`
-            } else if (item.plus === 0 && !showFinalPrice) {
-              priceLabel = isSoldOut ? '품절' : '포함'
+            } else if (item.plus === 0 && !showFinalPrice && isSoldOut) {
+              priceLabel = '품절'
             }
           }
 
@@ -89,7 +96,7 @@ export default function OptionGroup({
                     'w-[20px] h-[20px] rounded-[4px] border-2 flex items-center justify-center flex-shrink-0',
                     'transition-transform active:scale-90',
                     isSelected
-                      ? 'bg-[#017333] border-[#017333]'
+                      ? 'bg-[#16a84c] border-[#16a84c]'
                       : 'border-[#D7D7D7]',
                   ].join(' ')}>
                     {isSelected && (
@@ -99,22 +106,23 @@ export default function OptionGroup({
                     )}
                   </div>
                 ) : (
+                  // 선택되면 **원 전체를 칠하고 가운데를 흰 원으로 뚫는다.**
+                  // 테두리만 칠하고 안에 점을 찍던 예전 방식은 20px 원 안의 10px 점이라
+                  // 멀리서 보면 그냥 빈 원이었다.
                   <div className={[
-                    'w-[20px] h-[20px] rounded-full border-2 flex items-center justify-center flex-shrink-0',
+                    'w-[20px] h-[20px] rounded-full flex-shrink-0',
+                    'flex items-center justify-center',
                     'transition-transform active:scale-90',
                     isSelected
-                      ? 'border-[#017333]'
-                      : 'border-[#D7D7D7]',
+                      ? 'border-2 bg-[#16a84c] border-[#16a84c]'
+                      : 'border-[1.5px] border-[#D7D7D7]',
                   ].join(' ')}>
-                    {isSelected && (
-                      <div className="w-[10px] h-[10px] rounded-full bg-[#017333]" />
-                    )}
+                    {isSelected && <div className="w-[7px] h-[7px] rounded-full bg-white" />}
                   </div>
                 )}
 
                 <span className={[
-                  'text-[14px]',
-                  isSelected ? 'font-semibold text-[#1E1E1E]' : 'text-[#1E1E1E]',
+                  'text-[14px] text-[#1E1E1E]',
                   isSoldOut ? 'text-[#ABABAB]' : '',
                 ].join(' ')}>
                   {displayName}
@@ -124,7 +132,8 @@ export default function OptionGroup({
               {priceLabel && (
                 <span className={[
                   'text-[13px] flex-shrink-0',
-                  isSelected ? 'font-semibold text-[#017333]' : 'font-normal text-[#ABABAB]',
+                  'font-normal',
+                  isSelected ? 'text-[#16a84c]' : 'text-[#ABABAB]',
                   showFinalPrice ? 'text-[14px]' : '',
                 ].join(' ')}>
                   {priceLabel}

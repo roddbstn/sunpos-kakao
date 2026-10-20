@@ -2,38 +2,36 @@
 
 import { useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
+import { getSupabaseClient } from '@/lib/supabase/client'
 import { useSessionStore } from '@/lib/store/session'
 
-const SESSION_MS = 5 * 60 * 1000  // 5분
-
-// 주문 흐름 중에는 만료 체크 제외
-const EXEMPT_PATHS = ['/cart', '/checkout', '/success']
+// 주문 완료 흐름 중에는 만료 체크 제외
+// /register, /qr: 로그인 전(또는 무로그인) 상태로 진입하는 화면이라, "로그아웃 감지"가
+// 최초 방문을 SIGNED_OUT으로 오인해서 즉시 /로 튕겨버리는 걸 막아야 함
+const EXEMPT_PATHS = ['/cart', '/checkout', '/success', '/register', '/qr']
 
 export default function SessionExpiry() {
   const router   = useRouter()
   const pathname = usePathname()
-  const loginAt      = useSessionStore(s => s.loginAt)
-  const account      = useSessionStore(s => s.account)
-  const resetSession = useSessionStore(s => s.resetSession)
+  const { account, resetSession } = useSessionStore()
 
   useEffect(() => {
     if (EXEMPT_PATHS.some(p => pathname?.startsWith(p))) return
-    if (account?.isDemo) return  // 데모 세션은 만료 없음
-    if (!loginAt) return
+    if (account?.isDemo) return
 
-    function check() {
-      if (Date.now() - loginAt! > SESSION_MS) {
+    const supabase = getSupabaseClient()
+
+    // Supabase Auth 세션 만료/로그아웃 감지
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string) => {
+      if (event === 'SIGNED_OUT') {
         resetSession()
-        // ?store= 보존 — 없으면 루트 페이지가 storeNotFound 화면을 띄움
         const storeId = account?.storeId
-        router.replace(storeId ? `/?store=${storeId}&expired=1` : '/?expired=1')
+        router.replace(storeId ? `/?store=${storeId}` : '/')
       }
-    }
+    })
 
-    check()  // 마운트 시 즉시 한 번 체크
-    const id = setInterval(check, 10_000)  // 10초 간격
-    return () => clearInterval(id)
-  }, [pathname, loginAt, account, resetSession, router])
+    return () => subscription.unsubscribe()
+  }, [pathname, account, resetSession, router])
 
   return null
 }

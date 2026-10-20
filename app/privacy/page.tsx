@@ -6,12 +6,12 @@ export default function PrivacyPage() {
   const router = useRouter()
 
   return (
-    <div className="min-h-screen bg-white max-w-[430px] mx-auto flex flex-col">
+    <div className="min-h-screen bg-surface max-w-[430px] mx-auto flex flex-col">
       {/* 헤더 */}
-      <header className="flex items-center h-14 px-5 border-b border-[#D7D7D7] flex-shrink-0 sticky top-0 bg-white z-10">
+      <header className="flex items-center h-14 px-5 border-b border-[#D7D7D7] flex-shrink-0 sticky top-0 bg-surface z-10">
         <button
           onClick={() => router.back()}
-          className="-ml-3 p-3 rounded-full hover:bg-[#F5F5F5] transition-colors"
+          className="-ml-3 p-3 rounded-full hover:bg-[#F2F2F2] transition-colors"
         >
           <svg width="9" height="15" viewBox="0 0 9 15" fill="none"><path d="M8 1L1 7.5L8 14" stroke="#222222" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
         </button>
@@ -35,7 +35,7 @@ export default function PrivacyPage() {
           <h2 className="text-[15px] font-bold text-[#222222] mb-3">1. 수집하는 개인정보 항목</h2>
           <div className="space-y-3">
             <div className="border border-[#E8E8E8] rounded-xl overflow-hidden">
-              <div className="bg-[#FAFAFA] px-4 py-2 border-b border-[#E8E8E8]">
+              <div className="bg-[#F2F2F2] px-4 py-2 border-b border-[#E8E8E8]">
                 <span className="text-[12px] font-bold text-[#222222]">주문 시 수집 (필수)</span>
               </div>
               <div className="px-4 py-3 space-y-1">
@@ -46,7 +46,7 @@ export default function PrivacyPage() {
               </div>
             </div>
             <div className="border border-[#E8E8E8] rounded-xl overflow-hidden">
-              <div className="bg-[#FAFAFA] px-4 py-2 border-b border-[#E8E8E8]">
+              <div className="bg-[#F2F2F2] px-4 py-2 border-b border-[#E8E8E8]">
                 <span className="text-[12px] font-bold text-[#222222]">배달 주문 시 추가 수집 (필수)</span>
               </div>
               <div className="px-4 py-3 space-y-1">
@@ -55,7 +55,7 @@ export default function PrivacyPage() {
               </div>
             </div>
             <div className="border border-[#E8E8E8] rounded-xl overflow-hidden">
-              <div className="bg-[#FAFAFA] px-4 py-2 border-b border-[#E8E8E8]">
+              <div className="bg-[#F2F2F2] px-4 py-2 border-b border-[#E8E8E8]">
                 <span className="text-[12px] font-bold text-[#222222]">거래처 계약 시 수집 (필수)</span>
               </div>
               <div className="px-4 py-3 space-y-1">
@@ -98,7 +98,7 @@ export default function PrivacyPage() {
         <section>
           <h2 className="text-[15px] font-bold text-[#222222] mb-3">3. 개인정보 보유 및 이용 기간</h2>
           <div className="border border-[#E8E8E8] rounded-xl overflow-hidden">
-            <div className="grid grid-cols-2 bg-[#FAFAFA] border-b border-[#E8E8E8]">
+            <div className="grid grid-cols-2 bg-[#F2F2F2] border-b border-[#E8E8E8]">
               <div className="px-4 py-2 text-[12px] font-bold text-[#222222] border-r border-[#E8E8E8]">항목</div>
               <div className="px-4 py-2 text-[12px] font-bold text-[#222222]">보유 기간</div>
             </div>
@@ -123,7 +123,7 @@ export default function PrivacyPage() {
         <section>
           <h2 className="text-[15px] font-bold text-[#222222] mb-3">4. 개인정보 처리 위탁</h2>
           <div className="border border-[#E8E8E8] rounded-xl overflow-hidden mb-3">
-            <div className="grid grid-cols-2 bg-[#FAFAFA] border-b border-[#E8E8E8]">
+            <div className="grid grid-cols-2 bg-[#F2F2F2] border-b border-[#E8E8E8]">
               <div className="px-4 py-2 text-[12px] font-bold text-[#222222] border-r border-[#E8E8E8]">수탁자</div>
               <div className="px-4 py-2 text-[12px] font-bold text-[#222222]">위탁 업무</div>
             </div>
@@ -183,7 +183,7 @@ export default function PrivacyPage() {
               ['🗑️ 삭제', '불필요한 정보 삭제 요청'],
               ['🚫 처리 정지', '특정 처리 중단 요청'],
             ].map(([title, desc]) => (
-              <div key={title} className="bg-[#FAFAFA] rounded-xl px-3 py-2.5">
+              <div key={title} className="bg-[#F2F2F2] rounded-xl px-3 py-2.5">
                 <p className="font-semibold text-[#222222] text-[12px]">{title}</p>
                 <p className="text-[#727272] text-[11px] mt-0.5">{desc}</p>
               </div>
@@ -210,7 +210,7 @@ export default function PrivacyPage() {
         {/* 9 */}
         <section>
           <h2 className="text-[15px] font-bold text-[#222222] mb-3">9. 개인정보 보호책임자 및 문의</h2>
-          <div className="bg-[#FAFAFA] rounded-xl px-4 py-4 space-y-2">
+          <div className="bg-[#F2F2F2] rounded-xl px-4 py-4 space-y-2">
             <div className="flex gap-3">
               <span className="text-[#727272] w-20 flex-shrink-0">서비스명</span>
               <span className="font-semibold text-[#222222]">프리POS</span>

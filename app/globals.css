@@ -3,24 +3,35 @@
 :root {
   --green: #017333;
   --green-soft: #E6F4EC;
-  --ink: #222222;
+  --ink: #1E1E1E;
   --gray-text: #727272;
   --gray-border: #D7D7D7;
   --gray-bg: #FAFAFA;
   --gray-50: #F5F5F5;
   --danger: #C92A2A;
+  --surface: #FCFCFC;
   --shadow-lg: 0 -4px 20px rgba(0,0,0,0.08);
+
+  /* Terracotta */
+  --terra-bg: #FAF5EF;
+  --terra-100: #F0DDD0;
+  --terra-400: #D4876A;
+  --terra-500: #C47050;
+  --terra-600: #A85A3C;
+  --terra-700: #8B4429;
+  --terra-text: #3D1C0E;
 }
 
 @theme inline {
   --color-green: #017333;
   --color-green-soft: #E6F4EC;
-  --color-ink: #222222;
+  --color-ink: #1E1E1E;
   --color-gray-text: #727272;
   --color-gray-border: #D7D7D7;
   --color-gray-bg: #FAFAFA;
   --color-gray-50: #F5F5F5;
   --color-danger: #C92A2A;
+  --color-surface: #FCFCFC;
 }
 
 html {
@@ -38,6 +49,23 @@ button {
 
 button:active {
   transform: scale(0.96);
+}
+
+@keyframes floatA {
+  0%, 100% { transform: translateY(0px) rotate(-18deg); }
+  50%       { transform: translateY(-14px) rotate(-18deg); }
+}
+@keyframes floatB {
+  0%, 100% { transform: translateY(0px) rotate(8deg); }
+  50%       { transform: translateY(-18px) rotate(8deg); }
+}
+@keyframes floatC {
+  0%, 100% { transform: translateY(0px) rotate(-5deg); }
+  50%       { transform: translateY(-10px) rotate(-5deg); }
+}
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes shake {
@@ -68,13 +96,100 @@ button:active {
   to   { opacity: 1; }
 }
 
+@keyframes shimmerSweep {
+  0%   { transform: translateX(-100%); }
+  60%  { transform: translateX(200%); }
+  100% { transform: translateX(200%); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50%       { opacity: 1;   transform: scale(1.08); }
+}
+
+@keyframes particleFloat {
+  0%   { opacity: 0;   transform: translateY(0px); }
+  20%  { opacity: 0.8; }
+  80%  { opacity: 0.6; }
+  100% { opacity: 0;   transform: translateY(var(--anim-y, -16px)); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes celebrateBounce {
+  0%   { transform: scale(0.3); opacity: 0; }
+  50%  { transform: scale(1.08); opacity: 1; }
+  70%  { transform: scale(0.96); }
+  100% { transform: scale(1); }
+}
+
+@keyframes confettiFall {
+  0%   { transform: translateY(-12px) rotate(0deg); opacity: 0; }
+  15%  { opacity: 1; }
+  100% { transform: translateY(140px) rotate(360deg); opacity: 0; }
+}
+
 /* 모바일 우선, max-width 430px */
 .screen {
   max-width: 430px;
   margin: 0 auto;
+  /* height(고정) 여야 한다. min-height 면 내용이 길어질 때 컨테이너가 뷰포트 밖으로 자라고,
+     그러면 안쪽 `flex-1 overflow-y-auto` 가 제한을 못 받아 스크롤이 안 생긴다.
+     그 결과 하단 버튼 바(footer flex-shrink-0)가 문서 맨 끝으로 밀려서
+     "끝까지 스크롤해야 주문하기 버튼이 보이는" 상태가 된다. */
+  height: 100dvh;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  background: #fff;
+  background: var(--surface);
   position: relative;
+}
+
+
+/* ── 하단 시트 ────────────────────────────────────────────────────────────
+   화면 아래에서 밀려 올라오는 모달. cubic-bezier 는 끝에서 살짝 감속만 —
+   튕기는 곡선은 손가락으로 끌어올린 느낌을 흉내 내려다 오히려 느리게 느껴진다. */
+@keyframes sheetUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+@keyframes backdropFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.sheet-in    { animation: sheetUp 280ms cubic-bezier(0.22, 0.9, 0.3, 1) both; }
+.backdrop-in { animation: backdropFadeIn 280ms ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet-in, .backdrop-in { animation-duration: 1ms; }
+}
+
+
+/* ── 로딩 타이머 (components/ui/loading-timer.tsx) ──────────────────────────
+   몸통은 좌우로 기울었다 잦아들고, 바늘은 쉬지 않고 돈다.
+   한 주기 끝에 쉬는 구간(70~100%)을 둔 이유: 쉬지 않고 흔들면 눈이 피로하고
+   "에러로 떨고 있다"처럼 보인다. 울렸다 멈췄다 해야 알람으로 읽힌다. */
+@keyframes timerWobble {
+  0%   { transform: rotate(0deg); }
+  8%   { transform: rotate(-13deg); }
+  18%  { transform: rotate(11deg); }
+  28%  { transform: rotate(-8deg); }
+  38%  { transform: rotate(6deg); }
+  48%  { transform: rotate(-3deg); }
+  58%  { transform: rotate(0deg); }
+  100% { transform: rotate(0deg); }
+}
+@keyframes timerHand {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.timer-wobble { animation: timerWobble 1.8s ease-in-out infinite; transform-origin: 50% 60%; }
+.timer-hand   { animation: timerHand 1.2s linear infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .timer-wobble { animation: none; }
+  .timer-hand   { animation-duration: 3s; }
 }

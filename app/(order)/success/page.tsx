@@ -10,7 +10,7 @@ import { track } from '@/lib/firebase'
 import { ampTrack } from '@/lib/amplitude'
 import type { CartItem } from '@/lib/types'
 import LoadingTimer from '@/components/ui/loading-timer'
-import { WaitingLabel, StatusBadge } from '@/components/order/OrderStatusHeader'
+import { WaitingLabel, StatusBadge, type StatusKind } from '@/components/order/OrderStatusHeader'
 
 type OrderResultStatus = 'pending' | 'accepted' | 'rejected'
 
@@ -502,6 +502,62 @@ function SuccessPageInner() {
     return () => clearTimeout(t)
   }, [status])
 
+  /**
+   * 개발 환경 전용 상태 미리보기 — `?preview=cooking` · `?preview=waiting`.
+   *
+   * 이 화면은 세 상태를 오가는데(확인중 → 준비중 → 준비완료) 그걸 보려면 실제로
+   * 주문을 넣고 점주가 POS 에서 접수해 줘야 한다. 디자인을 만질 때마다 그럴 수는
+   * 없어서, 전엔 sessionStorage 를 콘솔에 손으로 넣어 보게 했다 — 그건 부탁할 일이
+   * 아니다. 주소에 붙이기만 하면 되게 바꾼다.
+   *
+   * NODE_ENV 로 막아서 **배포본에는 아예 없다.** 번들러가 false 가지를 지운다.
+   */
+  const preview = process.env.NODE_ENV === 'development' ? searchParams.get('preview') : null
+  const previewCooking = preview === 'cooking'
+  /** ?preview=ready-delivery · ready-dinein · ready-takeout */
+  const previewReadyMethod =
+    preview === 'ready-delivery' ? '배달'
+    : preview === 'ready-dinein' ? '내점'
+    : preview === 'ready-takeout' ? '포장'
+    : null
+
+  /**
+   * 미리보기 예시 주문 — **렌더 중에** 깐다. (개발 환경 전용)
+   *
+   * effect 로 하면 늦다. 아래 데이터 effect 가 먼저 돌면서 주문코드가 없다고
+   * 판단해 '/' 로 돌려보내 버린다. 그래서 effect 가 아니라 렌더 경로에서 채운다.
+   *
+   * ?code= 는 붙이지 않는다 — 코드가 주소에 있으면 DB 조회 경로로 빠지는데,
+   * 예시 주문은 DB 에 없어서 전부 빈칸으로 그려진다(주문번호 자리에 UUID 가 찍혔다).
+   * sessionStorage 경로로 가야 예시 값이 쓰인다.
+   *
+   * sessionStorage 는 탭마다 따로라, 상태별로 창을 여러 개 띄워도 각 창이
+   * 스스로 채운다.
+   */
+  if (typeof window !== 'undefined' && preview && !sessionStorage.getItem('last_order_code')) {
+    const S = sessionStorage
+    S.setItem('last_order_code', '00000000-0000-0000-0000-0000000000aa')
+    S.setItem('last_order_number', '042')
+    S.setItem('last_order_method', previewReadyMethod ?? '포장')
+    S.setItem('last_order_total', '24100')
+    S.setItem('last_order_orderer', '김다현')
+    S.setItem('last_order_phone', '010-1234-5678')
+    S.setItem('last_order_account', '북구청 공원녹지과')
+    S.setItem('last_order_balance_before', '319800')
+    S.setItem('last_order_balance_after', '295700')
+    S.setItem('last_order_items', JSON.stringify([
+      { cartId: '1', menuCode: 'm1', menuName: '연어 포케', qty: 1, basePrice: 12000, subtotal: 12900,
+        selectedOptions: [{ groupName: '베이스', optionName: '현미밥', extraPrice: 900 }] },
+      { cartId: '2', menuCode: 'm2', menuName: '치킨 샐러드', qty: 1, basePrice: 11200, subtotal: 11200,
+        selectedOptions: [] },
+    ]))
+  }
+
+  // ── Accepted ──────────────────────────────────────────────────────────
+  const hasTimer = totalSeconds !== null && secondsLeft !== null
+  const progress = hasTimer ? Math.min(1, 1 - secondsLeft! / totalSeconds!) : 0
+  const timerDone = hasTimer && secondsLeft === 0
+
   // ── 주문 생성 중 ──────────────────────────────────────────────────────
   //
   // 스피너는 **주문 RPC 가 아직 안 끝났을 때만** 띄운다.
@@ -556,25 +612,10 @@ function SuccessPageInner() {
     )
   }
 
-  // ── Accepted ──────────────────────────────────────────────────────────
-  const hasTimer = totalSeconds !== null && secondsLeft !== null
-  const progress = hasTimer ? Math.min(1, 1 - secondsLeft! / totalSeconds!) : 0
-  const timerDone = hasTimer && secondsLeft === 0
-  const isReady = posCompleted || timerDone
-  const isDelivery = orderMethod === '배달'
+  const isReady = previewReadyMethod !== null || posCompleted || timerDone
+  const method = previewReadyMethod ?? orderMethod
+  const isDelivery = method === '배달'
 
-  /**
-   * 개발 환경 전용 상태 미리보기 — `?preview=cooking` · `?preview=waiting`.
-   *
-   * 이 화면은 세 상태를 오가는데(확인중 → 준비중 → 준비완료) 그걸 보려면 실제로
-   * 주문을 넣고 점주가 POS 에서 접수해 줘야 한다. 디자인을 만질 때마다 그럴 수는
-   * 없어서, 전엔 sessionStorage 를 콘솔에 손으로 넣어 보게 했다 — 그건 부탁할 일이
-   * 아니다. 주소에 붙이기만 하면 되게 바꾼다.
-   *
-   * NODE_ENV 로 막아서 **배포본에는 아예 없다.** 번들러가 false 가지를 지운다.
-   */
-  const preview = process.env.NODE_ENV === 'development' ? searchParams.get('preview') : null
-  const previewCooking = preview === 'cooking'
   /**
    * 점주가 접수했는가 = 문구·아이콘이 '준비중'으로 넘어가는 기준.
    *
@@ -584,7 +625,27 @@ function SuccessPageInner() {
    * 0으로 두고 접수하면 타이머가 안 생기는데, 그래도 접수는 된 것이다.
    * 그때 '확인하고 있어요'가 계속 떠 있으면 거짓말이 된다.
    */
-  const isCooking = previewCooking || status === 'accepted'
+  const isCooking = !isReady && (previewCooking || status === 'accepted')
+
+  /**
+   * 지금 화면이 말해야 하는 것 — 문구와 그림이 한 쌍으로 움직인다.
+   *
+   * 준비 완료는 **이용방법마다 할 일이 다르다.** 전엔 셋을 뭉뚱그려
+   * "메뉴가 준비됐어요"로 적었는데, 배달 손님은 그 말을 보고도 매장으로 갈지
+   * 기다릴지 알 수 없다. 받는 방법을 문구가 직접 말해야 한다.
+   */
+  const statusKind: StatusKind =
+    !isReady   ? (isCooking ? 'cooking' : 'waiting')
+    : isDelivery      ? 'delivery'
+    : method === '내점' ? 'dinein'
+    : 'takeout'
+
+  const statusLabel =
+    statusKind === 'waiting'  ? '주문을 확인하고 있어요'
+    : statusKind === 'cooking' ? '음식이 준비중이에요'
+    : statusKind === 'delivery' ? '배달 라이더가 출발했어요'
+    : statusKind === 'dinein'   ? '음식이 다 준비됐어요!'
+    : '포장이 다 준비됐어요!'
 
   return (
     <div className="screen" style={{ paddingBottom: showReview ? '80px' : '0' }}>
@@ -592,56 +653,33 @@ function SuccessPageInner() {
           노치·상태바 아래 첫 줄이라 숨 쉴 자리가 필요하다. */}
       <div className="flex-1 overflow-y-auto px-4 pt-14 pb-6 space-y-4">
 
-        {/* 타이틀 */}
-        {isReady ? (
-          /* ── 준비 완료: 그라디에이션 배너 ── */
-          <div
-            className="rounded-2xl py-8 px-5 flex flex-col items-center gap-2 text-center"
-            style={{ background: 'linear-gradient(135deg, #02a84e 0%, #017333 60%, #015a28 100%)' }}
-          >
-            <p className="text-[20px] font-bold text-white mt-1">
-              {isDelivery
-                ? `${orderOrderer ? `${orderOrderer}님의 ` : ''}배달이 출발했어요`
-                : `${orderOrderer ? `${orderOrderer}님의 ` : ''}메뉴가 준비됐어요!`}
-            </p>
-            {isDelivery && departedAt && (
-              <div className="mt-1 px-4 py-1.5 rounded-full" style={{ backgroundColor: 'rgba(255,255,255,0.18)' }}>
-                <span className="text-[15px] font-bold text-white">
-                  {new Date(departedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })} 출발
-                </span>
-              </div>
-            )}
-            {(orderNumber ?? orderCode) && (
-              <span className="font-mono font-extrabold text-white text-[44px] tracking-widest leading-none">
-                #{orderNumber ?? orderCode}
-              </span>
-            )}
-            {!isDelivery && (
-              <p className="text-[13px] text-white/75 font-semibold">매장에서 받아가세요</p>
-            )}
-          </div>
-        ) : (
-          /* ── 접수 전: 확인중 → 준비중 ──
-             '주문이 접수됐어요!' 를 걷어냈다. 그 말은 **아무것도 알려주지 않는다** —
-             주문을 넣은 사람은 넣은 걸 이미 안다. 알고 싶은 건 "지금 어디까지 갔나"다.
-             그래서 이 자리에 진행 상태를 둔다:
-                확인중  점주가 POS 에서 볼 때까지.  영수증이 펄럭인다
-                준비중  점주가 접수(예상시간 입력).  후라이팬이 움직인다 */
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-[23px] font-bold text-[#1E1E1E] leading-snug tracking-tight">
-              <WaitingLabel label={isCooking ? '음식이 준비중이에요' : '주문을 확인하고 있어요'} />
-            </p>
-            <StatusBadge cooking={isCooking} />
-          </div>
+        {/* ── 상태 머리 ──
+            다섯 상태가 **같은 틀**을 쓴다(문구 + 그림). 전엔 준비 완료만 초록
+            그라디언트 배너에 주문번호를 또 크게 박아 넣어서, 아래 주문번호 줄과
+            같은 숫자가 두 번 나왔다. 틀이 하나면 상태가 바뀌어도 눈이 같은 자리를 본다.
+
+            준비 완료는 글자를 초록으로 — 기다리는 상태(검정)와 끝난 상태를
+            색 하나로 가른다. 점 세 개도 그때는 붙이지 않는다(더 기다릴 게 없다). */}
+        <div className="flex items-center justify-between gap-3">
+          <p className={`text-[23px] font-bold leading-snug tracking-tight ${
+            isReady ? 'text-[#017333]' : 'text-[#1E1E1E]'
+          }`}>
+            {isReady ? statusLabel : <WaitingLabel label={statusLabel} />}
+          </p>
+          <StatusBadge kind={statusKind} />
+        </div>
+
+        {/* 받는 방법 한 줄 — 준비 완료일 때만. 전엔 초록 배너 안에 있던 정보다 */}
+        {isReady && (
+          <p className="text-[13px] text-[#727272] leading-relaxed">
+            {isDelivery
+              ? (departedAt
+                  ? `${new Date(departedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })}에 출발했어요. 곧 도착해요`
+                  : '곧 도착해요')
+              : '매장에서 주문번호를 보여주고 받아가세요'}
+          </p>
         )}
 
-        {/* ── 대기시간 / 취소 ──
-            주문번호와 **자리를 바꿨다.** 손님이 이 화면에서 계속 보는 건 "얼마나
-            기다리나"이고, 주문번호는 받을 때 한 번 쓴다. 자주 보는 것이 위로 온다.
-
-            접수 전에는 같은 자리에 '주문 취소'가 선다. 취소할 수 있는 시간이
-            점주가 접수하기 전까지뿐이라, 그 창이 열려 있는 동안만 보여야 한다.
-            접수되는 순간 realtime 으로 status 가 바뀌고 이 블록이 타이머로 교체된다. */}
         {/* ── 예상 대기시간 ──
             주문번호와 **자리를 바꿨다.** 손님이 이 화면에서 계속 보는 건 "얼마나
             기다리나"이고, 주문번호는 받을 때 한 번 쓴다. 자주 보는 것이 위로 온다.
@@ -684,7 +722,7 @@ function SuccessPageInner() {
             {/* 선은 글자보다 훨씬 옅게. 같은 농도면 선이 글자와 경쟁해서
                 '표 머리글'처럼 보인다 — 여기선 글자가 주인공이다. */}
             <span className="h-px flex-1 bg-[#EDEDED]" />
-            <p className="font-pretendard text-[21px] font-semibold text-[#017333] tracking-[-0.01em] whitespace-nowrap">
+            <p className="font-pretendard text-[21px] font-semibold text-[#017333] tracking-[-0.01em] truncate max-w-full">
               주문번호 <span className="ml-[2px]">{orderNumber ?? orderCode}</span>
             </p>
             <span className="h-px flex-1 bg-[#EDEDED]" />

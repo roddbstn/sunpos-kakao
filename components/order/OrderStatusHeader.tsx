@@ -39,7 +39,7 @@ export function WaitingLabel({ label }: { label: string }) {
  * 자리라 회색으로 두면 '비활성'으로 읽힌다 — 지금 진행 중이라는 뜻의 아이콘이다.
  * 종이는 옅게(0.3), 글자줄과 말린 단은 진하게 — 원본의 두 톤 관계를 유지한다.
  */
-export function ReceiptIcon({ size = 38 }: { size?: number }) {
+export function ReceiptIcon({ size = 46 }: { size?: number }) {
   return (
     <svg
       width={size} height={size} viewBox="0 0 24 24" fill="none"
@@ -83,7 +83,7 @@ export function ReceiptIcon({ size = 38 }: { size?: number }) {
  * 손잡이 쪽(오른쪽)을 축으로 흔든다 — 가운데를 축으로 두면 제자리에서 도는
  * 팽이처럼 보인다. 김 세 줄기가 차례로 피어올라 '조리 중'을 읽히게 한다.
  */
-export function PanIcon({ size = 38 }: { size?: number }) {
+export function PanIcon({ size = 46 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
       {/* 김 — 팬보다 먼저 그려 뒤로 보낸다. S 자로 굽혀야 '피어오르는' 것으로 읽힌다.
@@ -107,16 +107,98 @@ export function PanIcon({ size = 38 }: { size?: number }) {
 }
 
 /**
+ * 배달 라이더 — 배달 출발.
+ *
+ * 옆에서 본 스쿠터 + 사람. 둘 중 하나만 그리면 뜻이 반쯤 빠진다 —
+ * 스쿠터만 두면 '탈것', 사람만 두면 '직원'이다. 뒤에 배달통이 있어야 배달이 된다.
+ */
+export function RiderIcon({ size = 46 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      {/* 배달통 — 뒤에 싣는다. 이게 없으면 그냥 오토바이다 */}
+      <path d="M2.6 9.6h5.2v4.2H2.6z" fill="#017333" fillOpacity="0.3" />
+      <path d="M2.6 9.6h5.2v4.2H2.6z" stroke="#017333" strokeWidth="1.4" strokeLinejoin="round" />
+      {/* 사람 — 머리 + 앞으로 기운 몸 + 핸들로 뻗은 팔 */}
+      <circle cx="11.4" cy="6.4" r="2" fill="#017333" />
+      <path d="M10.6 8.8l1.6 4.6" stroke="#017333" strokeWidth="1.7" strokeLinecap="round" />
+      <path d="M11.2 10.2l4.2-.4" stroke="#017333" strokeWidth="1.6" strokeLinecap="round" />
+      {/* 스쿠터 — 발판에서 앞 포크·핸들까지 */}
+      <path d="M7.2 17.4h4.4l2.8-4.6h2.4" stroke="#017333" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M14.6 9.6h3M16.8 9.8l.5 4.4" stroke="#017333" strokeWidth="1.5" strokeLinecap="round" />
+      {/* 바퀴 */}
+      <circle cx="5.2" cy="17.6" r="2.9" fill="#017333" fillOpacity="0.3" />
+      <circle cx="5.2" cy="17.6" r="2.9" stroke="#017333" strokeWidth="1.5" />
+      <circle cx="18.4" cy="17.6" r="2.9" fill="#017333" fillOpacity="0.3" />
+      <circle cx="18.4" cy="17.6" r="2.9" stroke="#017333" strokeWidth="1.5" />
+    </svg>
+  )
+}
+
+/**
+ * 쟁반 위 음식 — 내점 준비 완료.
+ *
+ * 덮개(클로슈) + 쟁반. 접시에 음식을 그리는 것보다 덮개가 낫다 —
+ * 작은 크기에서 음식 모양은 뭉개져서 얼룩으로 보이는데, 덮개는 실루엣이 단순해
+ * 46px 에서도 '차려 놓은 음식'으로 읽힌다.
+ */
+export function TrayIcon({ size = 46 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      {/* 덮개 손잡이 */}
+      <path d="M12 6.4v1.6" stroke="#017333" strokeWidth="1.6" strokeLinecap="round" />
+      <circle cx="12" cy="5.6" r="1.1" fill="#017333" />
+      {/* 덮개 — 반원을 채운다 */}
+      <path d="M5.4 14.6a6.6 6.6 0 0 1 13.2 0Z" fill="#017333" fillOpacity="0.3" />
+      <path d="M5.4 14.6a6.6 6.6 0 0 1 13.2 0" stroke="#017333" strokeWidth="1.6" strokeLinejoin="round" />
+      {/* 쟁반 — 덮개보다 넓게. 같은 폭이면 덮개 바닥선으로만 보인다 */}
+      <path d="M3 15.2h18" stroke="#017333" strokeWidth="2" strokeLinecap="round" />
+      <path d="M5.6 17.6h12.8" stroke="#017333" strokeWidth="1.5" strokeLinecap="round" opacity="0.45" />
+    </svg>
+  )
+}
+
+/**
+ * 포장 봉투 — 포장 준비 완료.
+ *
+ * 손잡이가 **봉투 밖으로 솟아야** 포장봉투로 읽힌다. 몸통만 두면 상자가 된다.
+ * 위쪽 접힌 선도 종이봉투의 표식이다.
+ */
+export function BagIcon({ size = 46 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      {/* 손잡이 */}
+      <path d="M9.2 8.4a2.8 2.8 0 0 1 5.6 0" stroke="#017333" strokeWidth="1.5" strokeLinecap="round" />
+      {/* 몸통 */}
+      <path d="M5.4 8.4h13.2v11a1.8 1.8 0 0 1-1.8 1.8H7.2a1.8 1.8 0 0 1-1.8-1.8v-11Z"
+            fill="#017333" fillOpacity="0.3" />
+      <path d="M5.4 8.4h13.2v11a1.8 1.8 0 0 1-1.8 1.8H7.2a1.8 1.8 0 0 1-1.8-1.8v-11Z"
+            stroke="#017333" strokeWidth="1.5" strokeLinejoin="round" />
+      {/* 접힌 선 */}
+      <path d="M5.4 11.8h13.2" stroke="#017333" strokeWidth="1.4" />
+    </svg>
+  )
+}
+
+/**
  * 상태 아이콘 — **원 없이** 그대로 둔다.
  *
  * 전엔 초록 원 안에 흰 아이콘이었다. 원이 있으면 버튼처럼 보여서 누르려는 사람이
- * 생기고, 아이콘이 원에 갇혀 작아져 펄럭임·흔들림이 보이지 않았다.
- * 아이콘만 두면 움직임이 그대로 살고, 옆 문구와 같은 층으로 읽힌다.
+ * 생기고, 아이콘이 원에 갇혀 작아져 움직임이 보이지 않았다.
+ *
+ * 다섯 상태가 각자 다른 그림을 쓴다 — 소리 없이 화면만 봐도 어디까지 갔는지 알아야 한다:
+ *   waiting   영수증    점주가 주문을 보는 중
+ *   cooking   후라이팬   조리 중
+ *   delivery  라이더     배달 출발
+ *   dinein    쟁반       매장에서 받아가면 됨
+ *   takeout   봉투       포장 완료
  */
-export function StatusBadge({ cooking }: { cooking: boolean }) {
-  return (
-    <div className="flex-shrink-0">
-      {cooking ? <PanIcon /> : <ReceiptIcon />}
-    </div>
-  )
+export type StatusKind = 'waiting' | 'cooking' | 'delivery' | 'dinein' | 'takeout'
+
+export function StatusBadge({ kind }: { kind: StatusKind }) {
+  const Icon = kind === 'cooking'  ? PanIcon
+             : kind === 'delivery' ? RiderIcon
+             : kind === 'dinein'   ? TrayIcon
+             : kind === 'takeout'  ? BagIcon
+             : ReceiptIcon
+  return <div className="flex-shrink-0"><Icon /></div>
 }

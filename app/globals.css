@@ -193,3 +193,65 @@ button:active {
   .timer-wobble { animation: none; }
   .timer-hand   { animation-duration: 3s; }
 }
+
+/* ── 진행 중 점 세 개 ────────────────────────────────────────────────────────
+   선포스(sallaria-pos/src/index.css)의 .dot-bounce 를 **그대로** 옮겨왔다.
+   같은 제품군에서 "기다리는 중"을 같은 모양으로 보여야 한다. 곡선·간격·투명도
+   전부 동일하다 — 한쪽만 고치면 두 화면의 리듬이 어긋난다.
+
+   글자로 박은 '...' 은 멈춰 있어서 "눌린 건가, 멈춘 건가"가 구분되지 않는다.
+   주문 확인은 점주가 POS 를 볼 때까지 몇십 초가 걸리는 자리라 특히 그렇다. */
+@keyframes dot-bounce {
+  0%, 70%, 100% { transform: translateY(0);    opacity: 0.45; }
+  35%           { transform: translateY(-4px); opacity: 1; }
+}
+.dot-bounce > span {
+  display: inline-block;
+  animation: dot-bounce 1s ease-in-out infinite;
+}
+.dot-bounce > span:nth-child(2) { animation-delay: 0.15s; }
+.dot-bounce > span:nth-child(3) { animation-delay: 0.30s; }
+
+/* ── 영수증 펄럭임 (주문 확인중) ─────────────────────────────────────────────
+   점주가 POS 에서 주문을 들여다보는 동안이다. 종이가 손에 들려 살짝 흔들리는
+   느낌 — 좌우로 기울면서 아주 조금 뜬다. 회전만 주면 '로딩 스피너'로 읽혀서
+   translateY 를 섞었다. */
+@keyframes receipt-flutter {
+  0%, 100% { transform: rotate(-5deg) translateY(0); }
+  25%      { transform: rotate(3deg)  translateY(-1.5px); }
+  50%      { transform: rotate(-2deg) translateY(0.5px); }
+  75%      { transform: rotate(4deg)  translateY(-1px); }
+}
+.receipt-flutter {
+  animation: receipt-flutter 1.6s ease-in-out infinite;
+  transform-origin: 50% 20%;   /* 위쪽을 잡은 것처럼 — 아래가 더 흔들린다 */
+}
+
+/* ── 후라이팬 조리 (음식 준비중) ─────────────────────────────────────────────
+   팬을 앞뒤로 흔들어 볶는 동작이다. 손목이 기준이라 transform-origin 을
+   손잡이 쪽(오른쪽)에 둔다 — 가운데로 두면 팬이 제자리에서 도는 것처럼 보인다. */
+@keyframes pan-toss {
+  0%, 100% { transform: rotate(0deg)   translateX(0); }
+  30%      { transform: rotate(-11deg) translateX(-1.5px); }
+  60%      { transform: rotate(5deg)   translateX(1px); }
+}
+.pan-toss {
+  animation: pan-toss 1.1s ease-in-out infinite;
+  transform-origin: 85% 60%;
+}
+/* 팬 위로 올라가는 김 — 세 줄기가 차례로 피어오른다 */
+@keyframes steam-rise {
+  0%   { opacity: 0;    transform: translateY(1px)  scaleY(0.6); }
+  35%  { opacity: 0.85; transform: translateY(-2px) scaleY(1); }
+  100% { opacity: 0;    transform: translateY(-5px) scaleY(1.1); }
+}
+.steam > * { animation: steam-rise 1.8s ease-out infinite; }
+.steam > *:nth-child(2) { animation-delay: 0.45s; }
+.steam > *:nth-child(3) { animation-delay: 0.9s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .dot-bounce > span { animation: none; opacity: 1; }
+  .receipt-flutter,
+  .pan-toss          { animation: none; }
+  .steam > *         { animation: none; opacity: 0.6; }
+}

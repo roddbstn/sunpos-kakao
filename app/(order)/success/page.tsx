@@ -3,12 +3,14 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useSessionStore } from '@/lib/store/session'
+import OtherStoreLeadButton from '@/components/OtherStoreLeadButton'
 import { getSupabaseClient } from '@/lib/supabase/client'
 import { formatWon } from '@/lib/utils'
 import { track } from '@/lib/firebase'
 import { ampTrack } from '@/lib/amplitude'
 import type { CartItem } from '@/lib/types'
 import LoadingTimer from '@/components/ui/loading-timer'
+import { WaitingLabel, StatusBadge } from '@/components/order/OrderStatusHeader'
 
 type OrderResultStatus = 'pending' | 'accepted' | 'rejected'
 
@@ -49,6 +51,22 @@ function SuccessPageInner() {
   const [orderBalanceAfter, setOrderBalanceAfter]   = useState<number | null>(null)
   const [rejectedReason,   setRejectedReason]    = useState<string>('')
   const [showReview,       setShowReview]        = useState(false)
+  /** 매장 좌표 — 가게 검색을 이 동네부터 보여주려고. 없어도 검색은 된다(전국). */
+  const [storeLoc, setStoreLoc] = useState<{ lat: number; lng: number } | null>(null)
+
+  // 매장 좌표 한 번만. 실패하면 조용히 넘어간다 — 좌표 없이도 검색은 된다.
+  useEffect(() => {
+    const sid = account?.storeId
+    if (!sid) return
+    let cancelled = false
+    void (async () => {
+      const { data } = await getSupabaseClient()
+        .from('stores').select('lat, lng').eq('id', sid).maybeSingle()
+      if (cancelled || data?.lat == null || data?.lng == null) return
+      setStoreLoc({ lat: data.lat, lng: data.lng })
+    })()
+    return () => { cancelled = true }
+  }, [account?.storeId])
 
   // 타이머
   const [totalSeconds,  setTotalSeconds]  = useState<number | null>(null)
@@ -534,6 +552,16 @@ function SuccessPageInner() {
   const timerDone = hasTimer && secondsLeft === 0
   const isReady = posCompleted || timerDone
   const isDelivery = orderMethod === '배달'
+  /**
+   * 점주가 접수했는가 = 문구·아이콘이 '준비중'으로 넘어가는 기준.
+   *
+   * status 가 'accepted' 면 orders.status 가 '조리중'/'완료' 로 바뀐 것이고,
+   * 그 UPDATE 에 prep_minutes 가 실려 온다(realtime). 즉 "접수 버튼을 눌렀다"와
+   * 같은 순간이다. 타이머(hasTimer)를 기준으로 삼지 않은 이유: 점주가 예상시간을
+   * 0으로 두고 접수하면 타이머가 안 생기는데, 그래도 접수는 된 것이다.
+   * 그때 '확인하고 있어요'가 계속 떠 있으면 거짓말이 된다.
+   */
+  const isCooking = status === 'accepted'
 
   return (
     <div className="screen" style={{ paddingBottom: showReview ? '80px' : '0' }}>
@@ -568,26 +596,38 @@ function SuccessPageInner() {
             )}
           </div>
         ) : (
-          /* ── 접수 완료: 기존 레이아웃 ── */
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xl font-bold text-[#222222]">주문이 접수됐어요!</p>
-              {(orderNumber ?? orderCode) && (
-                <span className="inline-block border border-[#b2dfc3] bg-[#E6F4EC] rounded-xl px-3 py-1 font-mono font-bold text-[#017333] text-[36px] tracking-widest leading-none mt-2">
-                  #{orderNumber ?? orderCode}
-                </span>
-              )}
-            </div>
-            <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, #02a84e 0%, #017333 60%, #015a28 100%)' }}>
-              <span className="text-white text-lg font-bold leading-none">✓</span>
-            </div>
+          /* ── 접수 전: 확인중 → 준비중 ──
+             '주문이 접수됐어요!' 를 걷어냈다. 그 말은 **아무것도 알려주지 않는다** —
+             주문을 넣은 사람은 넣은 걸 이미 안다. 알고 싶은 건 "지금 어디까지 갔나"다.
+             그래서 이 자리에 진행 상태를 둔다:
+                확인중  점주가 POS 에서 볼 때까지.  영수증이 펄럭인다
+                준비중  점주가 접수(예상시간 입력).  후라이팬이 움직인다 */
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xl font-bold text-[#222222]">
+              <WaitingLabel label={isCooking ? '음식이 준비중이에요' : '주문을 확인하고 있어요'} />
+            </p>
+            <StatusBadge cooking={isCooking} />
           </div>
         )}
 
-        {/* 타이머 (준비 전에만) */}
-        {hasTimer && !isReady && (
+        {/* ── 대기시간 / 취소 ──
+            주문번호와 **자리를 바꿨다.** 손님이 이 화면에서 계속 보는 건 "얼마나
+            기다리나"이고, 주문번호는 받을 때 한 번 쓴다. 자주 보는 것이 위로 온다.
+
+            접수 전에는 같은 자리에 '주문 취소'가 선다. 취소할 수 있는 시간이
+            점주가 접수하기 전까지뿐이라, 그 창이 열려 있는 동안만 보여야 한다.
+            접수되는 순간 realtime 으로 status 가 바뀌고 이 블록이 타이머로 교체된다. */}
+        {/* ── 예상 대기시간 ──
+            주문번호와 **자리를 바꿨다.** 손님이 이 화면에서 계속 보는 건 "얼마나
+            기다리나"이고, 주문번호는 받을 때 한 번 쓴다. 자주 보는 것이 위로 온다.
+
+            접수 전에는 이 자리가 **빈다.** 위의 '주문을 확인하고 있어요…'가 이미
+            상태를 말하고 있어서, 여기에 또 안내문을 넣으면 같은 말이 두 번 된다.
+            (주문 취소 버튼을 여기 두는 안이 있었는데 걷어냈다 — 선결제 거래처
+             손님이라 익명 소비자용 취소 흐름이 필요한 자리가 아니다.) */}
+        {isCooking && hasTimer && (
           <div className="rounded-2xl px-5 py-4" style={{ background: 'linear-gradient(135deg, #02a84e 0%, #017333 60%, #015a28 100%)' }}>
-            <p className="text-[11px] font-semibold text-white/70 mb-1">{orderMethod === '배달' ? '출발까지 예상 대기시간' : '예상 대기시간'}</p>
+            <p className="text-[11px] font-semibold text-white/70 mb-1">{isDelivery ? '출발까지 예상 대기시간' : '예상 대기시간'}</p>
             <p className="text-[24px] font-extrabold text-white leading-none mb-3 tabular-nums">
               {formatTime(secondsLeft!)}
             </p>
@@ -603,6 +643,29 @@ function SuccessPageInner() {
           </div>
         )}
 
+        {/* ── 주문번호 ──
+            박스를 걷어냈다. 테두리·배경이 있으면 주변 카드들과 같은 격으로 읽혀서
+            "이것도 정보 묶음 하나"가 된다. 번호는 **번호만** 크게 보이면 된다.
+            가운데 정렬 — 매장에서 보여줄 때 화면을 돌려 내밀는 숫자다. */}
+        {(orderNumber ?? orderCode) && (
+          <div className="text-center pt-1">
+            <p className="text-[12px] font-normal text-[#727272]">주문번호</p>
+            <p className="font-mono font-extrabold text-[#017333] text-[40px] tracking-widest leading-none mt-1">
+              {orderNumber ?? orderCode}
+            </p>
+          </div>
+        )}
+
+        {/* 다른 선결제 가게 제보 — 주문번호 바로 아래.
+            아래 '주문 정보'부터는 다시 내 주문 얘기라, 다른 주제는 그 앞에서 닫는다. */}
+        <div className="pt-1">
+          <OtherStoreLeadButton
+            storeLocation={storeLoc}
+            fromStoreId={account?.storeId ?? null}
+            fromAccountCode={account?.code ?? null}
+            onReported={() => { track('store_lead_submitted'); ampTrack('store_lead_submitted') }}
+          />
+        </div>
 
         {/* 주문 정보 */}
         <div className="bg-[#F2F2F2] rounded-xl px-4 py-4 space-y-2 text-sm">
@@ -722,6 +785,7 @@ function SuccessPageInner() {
           주문 접수 후에는 취소 및 환불이 어려워요<br />
           문의는 매장으로 직접 연락해 주세요
         </p>
+
       </div>
 
       {/* 네이버 리뷰 — 하단 스티키 플로팅 */}

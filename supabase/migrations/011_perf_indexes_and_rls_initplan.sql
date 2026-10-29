@@ -1,0 +1,97 @@
+-- 성능 리팩토링 (2026-10-21) — 실제 적용은 Supabase 에서 끝났고 이 파일은 저장소 기록용.
+--
+-- ① FK 커버링 인덱스 16개 추가
+--    린트 unindexed_foreign_keys 16 → 0. 동작 불변, 데이터가 커질 때 열화를 막는 쪽.
+--
+-- ② 죽은 인덱스 3개 제거 (user_events — 0행·정책 0개·쓰던 코드 제거됨)
+--    print_logs 인덱스 2개는 남겼다. 0행이지만 '인쇄 기록 연결'이 미구현 기능이라
+--    들어오면 바로 쓰인다. 린트의 "안 쓰임"만 보고 지우면 나중에 다시 만든다.
+--
+-- ③ RLS initplan 교정 — 정책 17개
+--    auth.uid() 를 그대로 쓰면 Postgres 가 **행마다** 다시 부른다.
+--    (select auth.uid()) 로 감싸면 InitPlan 으로 한 번만 평가한다.
+--    표현식의 논리는 한 글자도 바꾸지 않고 괄호만 씌웠다.
+--    린트 auth_rls_initplan 17 → 0.
+--
+--    검증 방법: 바꾸기 전후로 손님(54a90d87…)·점주(a73cc59d…) 두 역할을
+--    set role + request.jwt.claim.sub 로 흉내 내서 10개 테이블의 행 수를 비교했다.
+--    두 차수 모두 전부 동일했다.
+--      손님  sunpos_users 1 / links 4 / addresses 1 / accounts 4 / members 6 / clients 1 / stores 0
+--      점주  clients 1 / stores 1 / accounts 34 / members 99 / subscriptions 1 / links 1
+--
+-- 아직 안 한 것: multiple_permissive_policies 19건(④).
+--   menus·categories·option_groups·option_items 가 SELECT 정책을 2개씩 갖고 있어
+--   메뉴 쿼리가 매번 두 번 평가된다. 정책 통합은 권한 경계를 바꾸므로 별도 작업.
+
+-- ④ 중복 permissive 정책 통합 (2026-10-21) — menus/categories/option_groups/
+--   option_items/menu_option_groups 5개 테이블.
+--
+--   문제의 모양: 각 테이블이 (anon 읽기) + (authenticated 읽기) + (owner ALL) 3개를
+--   갖고 있었고, **authenticated 의 SELECT 에서만** 읽기 정책과 owner 정책이 동시에 걸려
+--   행마다 정책이 두 번 평가됐다.
+--
+--   통합 방식: owner 의 '읽기 분기'를 읽기 정책에 OR 로 접고, owner ALL 은
+--   INSERT/UPDATE/DELETE 로 쪼갰다. 그러면 명령마다 정책이 정확히 하나씩만 돈다.
+--   허용 범위는 OR 로 보존되므로 보이는 행은 그대로다.
+--
+--   검증(anon · 손님 · 점주 3개 역할, 변경 전후 대조):
+--     anon  menus 160 / categories 24 / option_groups 210 / option_items 492 / mog 425
+--     손님  동일
+--     점주  menus 166(숨김 6 포함) / option_items 493  ← owner 분기가 살아 있음을 증명
+--     쓰기  점주 UPDATE 성공(21·205·485·420행), 손님 UPDATE 0행 차단
+--
+--   결과: multiple_permissive_policies 19 → 14 (남은 14건은 account_members·accounts·
+--   stores·user_account_links — 메뉴 경로가 아니라 이번 범위에서 제외).
+--   실측: menus 쿼리 100ms → 48ms, categories 106ms → 82ms.
+
+-- ⑥ qr_menu_board(p_store_id) — 카테고리 + 메뉴를 한 번에 (2026-10-21)
+--
+--   전엔 categories 를 받아야 그 id 로 menus 를 칠 수 있어 왕복이 반드시 두 번이었다.
+--   RPC 는 SECURITY INVOKER 다. DEFINER 로 만들면 RLS 를 건너뛰어 숨김 메뉴까지
+--   나갈 수 있다. 호출자 권한이라 보이는 행이 기존 쿼리와 정확히 같다.
+--   반환 JSON 모양을 PostgREST 중첩 결과와 동일하게 맞춰 클라이언트 mapDbMenu 를
+--   한 줄도 고치지 않았다.
+--
+--   ⚠️ 처음엔 메뉴마다 상관 서브쿼리를 돌렸다가 침산점에서 **515ms** 가 나왔다.
+--      메뉴 155개 × 옵션그룹마다 서브쿼리가 다시 도는 SQL 안의 N+1 이었고,
+--      RLS 가 그때마다 재평가돼 더 나빠졌다. 기존 2쿼리 방식은 2.3ms + 1.5ms 였으니
+--      200배 퇴보였다. 작은 매장(행포케·메뉴 2개)으로만 보면 103ms 라 놓칠 뻔했다.
+--      → 아래에서 위로 한 번씩만 집계하는 집합 기반으로 재작성: 515ms → 44.5ms.
+--
+--   option_items 에 max_quantity 를 포함한다 — sallaria(QR웹)가 수량 버튼에 쓴다.
+--   빠뜨리면 그 기능이 조용히 사라진다.
+--
+--   검증: anon 역할로 카테고리 21 / 메뉴 155 / 옵션링크 406 / 옵션항목 1,983 —
+--         기존 조인 쿼리 결과와 전부 일치.
+--   실측: sunpos-kakao 64ms · sallaria(침산점, 메뉴 155개) 342ms, 가격 157개 렌더 확인.
+
+-- ⑧ 중복 정책 마무리 (2026-10-21) — accounts · account_members · user_account_links · stores
+--
+--   account_members 의 auth_all_account_members 와 owner_account_members 는
+--   명령·역할·표현식이 **완전히 동일한 중복**이었다. 하나는 그냥 삭제.
+--
+--   나머지는 ④와 같은 꼴: owner 의 읽기 분기를 읽기 정책에 OR 로 접고
+--   owner ALL 을 INSERT/UPDATE/DELETE 로 쪼갰다.
+--
+--   stores 는 구조가 달랐다. stores_select_own 이 public 역할이라 anon 까지 평가됐는데
+--   anon 은 anon_read_stores(true) 로 이미 전부 보므로 anon 에겐 순수 낭비였다.
+--   읽기를 anon 용/authenticated 용으로 갈랐다. INSERT 는 owner_stores 와
+--   stores_insert_own 의 with_check 가 같아 하나로 합쳤다.
+--
+--   검증(anon · 손님 · 점주 · 점주2):
+--     anon   accounts 0 / members 0 / links 0 / stores 9
+--     손님   accounts 4 / members 6 / links 4
+--     점주   accounts 34 / members 99 / links 1
+--     쓰기   점주 accounts 34행·members 99행 수정 가능, 손님 0행 차단
+--            점주2 stores 읽기 2 · 수정 2
+--
+--   결과: multiple_permissive_policies 19 → 0
+--
+-- ⑨ 분석 초기화 지연 (앱 코드, components/FirebaseInit.tsx)
+--   FirebaseInit 이 루트 레이아웃에 있어 PIN 화면을 포함한 모든 페이지에서 즉시 돌았다.
+--   firebase.googleapis.com 왕복 214ms 가 첫 데이터 로딩과 대역폭을 다퉜다.
+--   requestIdleCallback 만으론 부족해서(페이지가 금방 한가해져 다시 겹쳤고
+--   qr_account_public 이 107ms → 309ms 로 늘었다) **하한 2초 지연 + idle** 로 바꿨다.
+--     → qr_account_public 309ms → 121ms, firebase 는 4387ms 로 밀림
+--   Pretendard CDN 스타일시트(렌더 블로킹)도 제거 — 앱 전체에서 단 한 곳만 쓰고 있었다.
+--   Sentry 는 **끄지 않았다**. 48ms 이고 라이브 제품의 장애 감지를 성능 때문에 버릴 수 없다.

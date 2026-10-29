@@ -689,17 +689,19 @@ function SuccessPageInner() {
             끼면 서브텍스트가 다음 블록처럼 떨어져 보인다. */}
         <div>
           <div className="flex items-center justify-between gap-3">
-            <p className="text-[23px] font-bold text-[#1E1E1E] leading-snug tracking-tight">
+            <p className="text-[24px] font-bold text-[#1E1E1E] leading-snug tracking-tight">
               {isReady ? statusLabel : <WaitingLabel label={statusLabel} />}
             </p>
             <StatusBadge kind={statusKind} />
           </div>
 
           {/* 받는 방법 한 줄 — 준비 완료일 때만. 전엔 초록 배너 안에 있던 정보다.
-              13 → 14px. 이 줄이 "그래서 내가 뭘 해야 하나"를 말하는 유일한 문장이라
-              각주 크기로 두면 안 읽힌다. */}
+              13 → 16px, 회색 → 검정. 이 줄이 "그래서 내가 뭘 해야 하나"를 말하는
+              유일한 문장이다. 각주 크기에 회색으로 두면 장식처럼 읽혀 그냥 지나친다.
+              머리에 바짝 붙인다 — 음수 margin 이다. 머리 글자(24px)의 line-height 가
+              만드는 여백까지 걷어내야 두 줄이 한 덩어리로 읽힌다. */}
           {isReady && (
-            <p className="mt-[6px] text-[14px] text-[#727272] leading-relaxed">
+            <p className="-mt-[3px] text-[16px] text-[#1E1E1E] leading-snug">
               {isDelivery
                 ? (departedMinsAgo === null ? '조금 전 출발'
                    : departedMinsAgo === 0  ? '방금 출발'

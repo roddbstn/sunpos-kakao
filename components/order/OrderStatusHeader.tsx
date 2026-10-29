@@ -39,7 +39,7 @@ export function WaitingLabel({ label }: { label: string }) {
  * 자리라 회색으로 두면 '비활성'으로 읽힌다 — 지금 진행 중이라는 뜻의 아이콘이다.
  * 종이는 옅게(0.3), 글자줄과 말린 단은 진하게 — 원본의 두 톤 관계를 유지한다.
  */
-export function ReceiptIcon({ size = 46 }: { size?: number }) {
+export function ReceiptIcon({ size = 55 }: { size?: number }) {
   return (
     <svg
       width={size} height={size} viewBox="0 0 24 24" fill="none"
@@ -83,7 +83,7 @@ export function ReceiptIcon({ size = 46 }: { size?: number }) {
  * 손잡이 쪽(오른쪽)을 축으로 흔든다 — 가운데를 축으로 두면 제자리에서 도는
  * 팽이처럼 보인다. 김 세 줄기가 차례로 피어올라 '조리 중'을 읽히게 한다.
  */
-export function PanIcon({ size = 46 }: { size?: number }) {
+export function PanIcon({ size = 55 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
       {/* 김 — 팬보다 먼저 그려 뒤로 보낸다. S 자로 굽혀야 '피어오르는' 것으로 읽힌다.
@@ -115,7 +115,7 @@ export function PanIcon({ size = 46 }: { size?: number }) {
  *
  * 움직임: 달리듯 들썩이고, 뒤로 속도선이 흐른다.
  */
-export function MotoIcon({ size = 46 }: { size?: number }) {
+export function MotoIcon({ size = 55 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
       {/* 속도선 — 오토바이 뒤(왼쪽)에서 흐른다 */}
@@ -149,7 +149,7 @@ export function MotoIcon({ size = 46 }: { size?: number }) {
  * 작은 크기에서 음식 모양은 뭉개져서 얼룩으로 보이는데, 덮개는 실루엣이 단순해
  * 46px 에서도 '차려 놓은 음식'으로 읽힌다.
  */
-export function TrayIcon({ size = 46 }: { size?: number }) {
+export function TrayIcon({ size = 55 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
       <g className="tray-lift">
@@ -173,7 +173,7 @@ export function TrayIcon({ size = 46 }: { size?: number }) {
  * 손잡이가 **봉투 밖으로 솟아야** 포장봉투로 읽힌다. 몸통만 두면 상자가 된다.
  * 위쪽 접힌 선도 종이봉투의 표식이다.
  */
-export function BagIcon({ size = 46 }: { size?: number }) {
+export function BagIcon({ size = 55 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden className="bag-swing">
       {/* 손잡이 */}

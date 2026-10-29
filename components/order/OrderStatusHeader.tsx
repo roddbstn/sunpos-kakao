@@ -39,7 +39,7 @@ export function WaitingLabel({ label }: { label: string }) {
  * 자리라 회색으로 두면 '비활성'으로 읽힌다 — 지금 진행 중이라는 뜻의 아이콘이다.
  * 종이는 옅게(0.3), 글자줄과 말린 단은 진하게 — 원본의 두 톤 관계를 유지한다.
  */
-export function ReceiptIcon({ size = 30 }: { size?: number }) {
+export function ReceiptIcon({ size = 38 }: { size?: number }) {
   return (
     <svg
       width={size} height={size} viewBox="0 0 24 24" fill="none"
@@ -83,24 +83,24 @@ export function ReceiptIcon({ size = 30 }: { size?: number }) {
  * 손잡이 쪽(오른쪽)을 축으로 흔든다 — 가운데를 축으로 두면 제자리에서 도는
  * 팽이처럼 보인다. 김 세 줄기가 차례로 피어올라 '조리 중'을 읽히게 한다.
  */
-export function PanIcon({ size = 30 }: { size?: number }) {
+export function PanIcon({ size = 38 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
-      {/* 김 — 팬보다 먼저 그려서 팬 뒤로 가게 한다 */}
-      <g className="steam" stroke="#017333" strokeWidth="1.4" strokeLinecap="round" opacity="0.75">
-        <path d="M7.5 7.5c0-1 1-1.3 1-2.3" />
-        <path d="M10.5 6.6c0-1 1-1.3 1-2.3" />
-        <path d="M13.5 7.5c0-1 1-1.3 1-2.3" />
+      {/* 김 — 팬보다 먼저 그려 뒤로 보낸다. S 자로 굽혀야 '피어오르는' 것으로 읽힌다.
+          직선 세 개로 두면 떠 있는 점선이 되고, 굵으면 쉼표처럼 보인다(둘 다 겪었다). */}
+      <g className="steam" stroke="#017333" strokeWidth="1.35" strokeLinecap="round" opacity="0.75">
+        <path d="M6.6 8.2c-1.1-1.2 1-2 0-3.2" />
+        <path d="M9.9 7.4c-1.1-1.2 1-2 0-3.2" />
+        <path d="M13.2 8.2c-1.1-1.2 1-2 0-3.2" />
       </g>
       <g className="pan-toss">
-        {/* 팬 몸통 — 반원 */}
-        <path
-          d="M2.8 11.5h12.4a6.2 6.2 0 0 1-12.4 0Z"
-          fill="#017333" fillOpacity="0.3" stroke="#017333" strokeWidth="1.5"
-          strokeLinejoin="round"
-        />
-        {/* 손잡이 */}
-        <path d="M15.2 11.9h5.4" stroke="#017333" strokeWidth="1.7" strokeLinecap="round" />
+        {/* 팬 바닥 — 가로로 납작한 반타원을 채운다. 정원이면 냄비처럼 보인다 */}
+        <path d="M3 12.5a6.9 5.6 0 0 0 13.8 0Z" fill="#017333" fillOpacity="0.3" />
+        {/* 림 — 바닥 폭에 맞춰 끊는다 */}
+        <path d="M2.5 12.5h14.8" stroke="#017333" strokeWidth="2" strokeLinecap="round" />
+        {/* 손잡이 — 림보다 **얇고 살짝 위로** 뻗는다.
+            같은 굵기로 한 줄에 이으면 손잡이가 사라지고 '막대 밑 그릇'이 된다. */}
+        <path d="M17.6 11.6l3.9-1.1" stroke="#017333" strokeWidth="1.7" strokeLinecap="round" />
       </g>
     </svg>
   )

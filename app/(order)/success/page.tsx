@@ -562,6 +562,19 @@ function SuccessPageInner() {
   const timerDone = hasTimer && secondsLeft === 0
   const isReady = posCompleted || timerDone
   const isDelivery = orderMethod === '배달'
+
+  /**
+   * 개발 환경 전용 상태 미리보기 — `?preview=cooking` · `?preview=waiting`.
+   *
+   * 이 화면은 세 상태를 오가는데(확인중 → 준비중 → 준비완료) 그걸 보려면 실제로
+   * 주문을 넣고 점주가 POS 에서 접수해 줘야 한다. 디자인을 만질 때마다 그럴 수는
+   * 없어서, 전엔 sessionStorage 를 콘솔에 손으로 넣어 보게 했다 — 그건 부탁할 일이
+   * 아니다. 주소에 붙이기만 하면 되게 바꾼다.
+   *
+   * NODE_ENV 로 막아서 **배포본에는 아예 없다.** 번들러가 false 가지를 지운다.
+   */
+  const preview = process.env.NODE_ENV === 'development' ? searchParams.get('preview') : null
+  const previewCooking = preview === 'cooking'
   /**
    * 점주가 접수했는가 = 문구·아이콘이 '준비중'으로 넘어가는 기준.
    *
@@ -571,7 +584,7 @@ function SuccessPageInner() {
    * 0으로 두고 접수하면 타이머가 안 생기는데, 그래도 접수는 된 것이다.
    * 그때 '확인하고 있어요'가 계속 떠 있으면 거짓말이 된다.
    */
-  const isCooking = status === 'accepted'
+  const isCooking = previewCooking || status === 'accepted'
 
   return (
     <div className="screen" style={{ paddingBottom: showReview ? '80px' : '0' }}>
@@ -615,7 +628,7 @@ function SuccessPageInner() {
                 확인중  점주가 POS 에서 볼 때까지.  영수증이 펄럭인다
                 준비중  점주가 접수(예상시간 입력).  후라이팬이 움직인다 */
           <div className="flex items-center justify-between gap-3">
-            <p className="text-xl font-bold text-[#222222]">
+            <p className="text-[23px] font-bold text-[#1E1E1E] leading-snug tracking-tight">
               <WaitingLabel label={isCooking ? '음식이 준비중이에요' : '주문을 확인하고 있어요'} />
             </p>
             <StatusBadge cooking={isCooking} />
@@ -637,16 +650,16 @@ function SuccessPageInner() {
             상태를 말하고 있어서, 여기에 또 안내문을 넣으면 같은 말이 두 번 된다.
             (주문 취소 버튼을 여기 두는 안이 있었는데 걷어냈다 — 선결제 거래처
              손님이라 익명 소비자용 취소 흐름이 필요한 자리가 아니다.) */}
-        {isCooking && hasTimer && (
+        {isCooking && (hasTimer || previewCooking) && (
           <div className="rounded-2xl px-5 py-4" style={{ background: 'linear-gradient(135deg, #02a84e 0%, #017333 60%, #015a28 100%)' }}>
             <p className="text-[11px] font-semibold text-white/70 mb-1">{isDelivery ? '출발까지 예상 대기시간' : '예상 대기시간'}</p>
             <p className="text-[24px] font-extrabold text-white leading-none mb-3 tabular-nums">
-              {formatTime(secondsLeft!)}
+              {formatTime(secondsLeft ?? 13 * 60 + 10)}
             </p>
             <div className="h-2 bg-white/25 rounded-full overflow-hidden">
               <div
                 className="h-full bg-white rounded-full transition-all duration-1000 ease-linear"
-                style={{ width: `${progress * 100}%` }}
+                style={{ width: `${(hasTimer ? progress : 0.11) * 100}%` }}
               />
             </div>
             <p className="text-[11px] text-white/60 mt-2 text-center">
@@ -656,20 +669,26 @@ function SuccessPageInner() {
         )}
 
         {/* ── 주문번호 ──
-            박스를 걷어냈다. 테두리·배경이 있으면 주변 카드들과 같은 격으로 읽혀서
-            "이것도 정보 묶음 하나"가 된다. 번호는 **번호만** 보이면 된다.
+            박스 대신 **양옆 가는 선** 사이에 놓는다.
+            테두리를 두르면 주변 카드들과 같은 격이 되어 "정보 묶음 하나"로 읽히고,
+            아무 장식 없이 두면 본문 한 줄로 흘러가 버린다. 선은 면을 만들지 않으면서
+            "여기서 한 번 끊긴다"만 말해준다 — 영수증을 뜯은 자리처럼.
 
-            라벨을 숫자 **왼쪽**에 두고 색·크기·글꼴을 똑같이 맞췄다. 위아래로
-            쌓고 크기를 달리 하면 '제목 + 값'이 되어 두 번 읽게 되는데,
-            '주문번호 042' 는 한 덩어리로 한 번에 읽히는 말이다.
+            라벨과 숫자는 색·크기·글꼴이 같다. '주문번호 042' 는 제목+값이 아니라
+            한 덩어리로 한 번에 읽히는 말이라서다.
 
-            Pretendard 를 쓰는 이유: 시스템 한글 폰트는 기기마다 숫자 폭과 한글
-            높이가 달라서, 한 줄에 선 '주문번호'와 '042' 의 밑선이 아이폰과
-            안드로이드에서 다르게 맞는다. */}
+            Pretendard: 시스템 한글 폰트는 기기마다 숫자 폭과 한글 높이가 달라서
+            한 줄에 선 '주문번호'와 '042' 의 밑선이 기기마다 다르게 맞는다. */}
         {(orderNumber ?? orderCode) && (
-          <p className="font-pretendard text-center text-[22px] font-semibold text-[#017333] tracking-tight">
-            주문번호 {orderNumber ?? orderCode}
-          </p>
+          <div className="flex items-center gap-[16px] py-[6px]">
+            {/* 선은 글자보다 훨씬 옅게. 같은 농도면 선이 글자와 경쟁해서
+                '표 머리글'처럼 보인다 — 여기선 글자가 주인공이다. */}
+            <span className="h-px flex-1 bg-[#EDEDED]" />
+            <p className="font-pretendard text-[21px] font-semibold text-[#017333] tracking-[-0.01em] whitespace-nowrap">
+              주문번호 <span className="ml-[2px]">{orderNumber ?? orderCode}</span>
+            </p>
+            <span className="h-px flex-1 bg-[#EDEDED]" />
+          </div>
         )}
 
         {/* 다른 선결제 가게 제보 — 주문번호 바로 아래.

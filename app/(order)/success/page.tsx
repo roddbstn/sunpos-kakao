@@ -502,8 +502,18 @@ function SuccessPageInner() {
     return () => clearTimeout(t)
   }, [status])
 
-  // ── Pending ───────────────────────────────────────────────────────────
-  if (status === 'pending') {
+  // ── 주문 생성 중 ──────────────────────────────────────────────────────
+  //
+  // 스피너는 **주문 RPC 가 아직 안 끝났을 때만** 띄운다.
+  //
+  // 전엔 조건이 `status === 'pending'` 이었다. 그런데 status 는 점주가 접수할
+  // 때까지 계속 'pending' 이라, 손님은 **기다리는 내내 빈 화면에 스피너만** 봤다.
+  // 주문번호도, 주문 내역도, 아무것도 안 보였다.
+  //
+  // 실제로 "아직 모르는" 구간은 order_code 가 TEMP- 인 동안뿐이다(낙관적 이동 중
+  // RPC 가 도는 몇백 ms). 그 뒤로는 보여줄 게 다 있으므로 화면을 그린다 —
+  // '주문을 확인하고 있어요' 가 그 자리를 받는다.
+  if (status === 'pending' && (!orderCode || orderCode.startsWith('TEMP-'))) {
     return (
       <div className="screen">
         {/* 스피너를 4px 테두리 64px 에서 2px 테두리 40px 로 줄였다. 기다리는 화면에서

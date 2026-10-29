@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { getSupabaseClient } from '@/lib/supabase/client'
 import { useSessionStore } from '@/lib/store/session'
@@ -51,6 +51,9 @@ export default function QrAccountEntryPage() {
   const [info, setInfo]       = useState<PublicInfo | null>(null)
 
   const [pin, setPin]           = useState('')
+  /** 입력 중인 PIN 의 진짜 값. state 만 쓰면 같은 틱에 들어온 탭이
+      전부 같은(낡은) 클로저 값을 읽어 한 자만 먹는다. */
+  const pinRef = useRef('')
   const [pinError, setPinError] = useState('')
   const [verifying, setVerifying] = useState(false)
   const [isShaking, setIsShaking] = useState(false)
@@ -102,23 +105,39 @@ export default function QrAccountEntryPage() {
 
   function handleNumpad(key: string) {
     if (verifying || isLocked) return
-    if (key === 'del') { setPin(p => p.slice(0, -1)); setPinError(''); return }
-    if (pin.length >= 4) return
-    const next = pin + key
-    setPin(next)
+    if (key === 'del') {
+      pinRef.current = pinRef.current.slice(0, -1)
+      setPin(pinRef.current)
+      setPinError('')
+      return
+    }
+    if (pinRef.current.length >= 4) return
+    pinRef.current += key
+    setPin(pinRef.current)
     setPinError('')
-    if (next.length === 4) void submitPin(next)
+    if (pinRef.current.length === 4) void submitPin(pinRef.current)
+  }
+
+  /** 틀렸을 때 비우기 — ref 와 state 를 같이 되돌려야 다음 입력이 어긋나지 않는다 */
+  function clearPin() {
+    pinRef.current = ''
+    setPin('')
   }
 
   async function submitPin(value: string) {
     setVerifying(true)
     try {
-      const res = await fetch('/api/pin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'verify_account', pin: value, accountCode }),
-      })
-      const result = await res.json()
+      // RPC 를 **직접** 부른다. 전엔 /api/pin 으로 한 번 돌았는데, 그 라우트는
+      // verify_account_pin_public 을 그대로 중계만 했다. Vercel 함수 홉이 하나
+      // 끼면서(콜드 스타트까지) PIN 한 번 넣는 데 왕복이 둘이 됐다.
+      // 그 RPC 는 anon 실행이 열려 있고, 잠금·비교·시도기록을 DB 트랜잭션 안에서
+      // 끝내고 참/거짓만 돌려주므로 브라우저에서 직접 불러도 노출되는 게 없다.
+      const supabase = getSupabaseClient()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
+        .rpc('verify_account_pin_public', { p_account_code: accountCode, p_pin: value })
+      if (error) throw error
+      const result = (Array.isArray(data) ? data[0] : data) ?? {}
 
       if (result.success) {
         if (!info) return
@@ -146,10 +165,10 @@ export default function QrAccountEntryPage() {
       } else {
         showError(`비밀번호가 일치하지 않아요 (${result.attempts_left ?? 0}회 남음)`)
       }
-      setPin('')
+      clearPin()
     } catch {
       showError('오류가 발생했어요. 다시 시도해 주세요.')
-      setPin('')
+      clearPin()
     } finally {
       setVerifying(false)
     }

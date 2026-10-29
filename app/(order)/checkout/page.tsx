@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { useCartStore } from '@/lib/store/cart'
 import { useSessionStore } from '@/lib/store/session'
-import { formatWon, formatOptionsLabel, DELIVERY_FEE } from '@/lib/utils'
+import { formatWon, formatOptionsLabel, DELIVERY_FEE, entrySourceBreakdown } from '@/lib/utils'
 import type { OrderMethod, OrderItemPayload } from '@/lib/types'
 import { PICKUP_OPTIONS, needsPickupTime, pickupSummary } from '@/lib/pickup-time'
 import { getSupabaseClient } from '@/lib/supabase/client'
@@ -143,6 +143,7 @@ export default function CheckoutPage() {
       setSavedAddressesLoaded(true)
       if (!autoSelectedOnce && list.length > 0 && !baseAddress) {
         setAutoSelectedOnce(true)
+        // list[0] = 설정에서 고른 기본 주소 (getSunposAddresses 가 맨 앞으로 정렬)
         selectSavedAddress(list[0])
       }
     })
@@ -443,14 +444,17 @@ export default function CheckoutPage() {
         detail: { order_code: result.order_code, order_number: result.order_number },
       }))
 
+      // 유입 경로 구성비를 함께 보낸다 — 장바구니엔 경로가 섞이므로 건수·금액 구성비로 싣는다
+      const breakdown = entrySourceBreakdown(items)
       track('purchase', {
         transaction_id: result.order_code,
         value:          total,
         currency:       'KRW',
         items:          items.map(i => ({ item_name: i.menuName, quantity: i.qty, price: i.basePrice })),
         method,
+        ...breakdown,
       })
-      ampTrack('purchase', { order_code: result.order_code, total, method })
+      ampTrack('purchase', { order_code: result.order_code, total, method, ...breakdown })
     } catch (err) {
       console.error('[checkout] unexpected error:', err)
       const reason = '주문 처리에 실패했습니다.'

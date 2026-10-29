@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { getSupabaseClient } from '@/lib/supabase/client'
 import {
   getSessionUser, getSunposProfile, updateSunposProfile,
-  getSunposAddresses, deleteSunposAddress,
+  getSunposAddresses, deleteSunposAddress, setDefaultAddress,
   type SunposAddress,
 } from '@/lib/auth'
 import AddressAddModal from '@/components/AddressAddModal'
@@ -123,6 +123,20 @@ export default function AccountSettingsPage() {
     finally { setBusy(false) }
   }
 
+  /**
+   * 다른 주소를 눌러 '현재 배달 주소'로 바꾼다.
+   *
+   * 낙관적 갱신은 하지 않는다 — 주소는 음식이 실제로 가는 곳이라,
+   * 서버가 못 받았는데 화면만 바뀌면 엉뚱한 데로 시킨다. 저장을 확인하고 다시 읽는다.
+   */
+  async function makeDefault(a: SunposAddress) {
+    if (a.isDefault || busy) return
+    setBusy(true); setError('')
+    try { await setDefaultAddress(a.id); await load() }
+    catch { setError('배달 주소를 바꾸지 못했어요') }
+    finally { setBusy(false) }
+  }
+
   async function removeAddress(id: string) {
     setBusy(true); setError('')
     try { await deleteSunposAddress(id); await load() }
@@ -152,10 +166,10 @@ export default function AccountSettingsPage() {
       <ScreenHeader title="설정" onBack={() => router.back()} />
 
       <div className="px-5 pb-10">
-      {/* 내 정보 — 라벨 없이 이름 · 전화번호 한 줄.
-          '내 전화번호'라는 제목은 바로 아래 번호가 이미 말하고 있다.
-          맨 위 블록이라 상단 여백은 mt-7 이 아니라 mt-4 — 헤더 바로 밑에서 뜨지 않게. */}
-      <section className="mt-4">
+      {/* 내 정보 — 이름이 이 화면의 주인이다. 맨 위에서 크고 굵게 받고,
+          전화번호는 그 아래 한 단계 작은 보조 줄로 내린다. 한 줄에 가운뎃점으로
+          이어붙였을 땐 둘이 같은 무게로 읽혀서 "내 이름"이 눈에 안 들어왔다. */}
+      <section className="mt-8">
         {editPhone ? (
           <div className="flex items-center gap-2">
             <input
@@ -171,13 +185,20 @@ export default function AccountSettingsPage() {
             </button>
           </div>
         ) : (
-          <div className="flex items-center justify-between gap-3">
-            <p className="min-w-0 truncate text-[15px] text-[#1E1E1E]">
-              {myNick || '—'}{myPhone ? ` · ${fmtPhone(myPhone)}` : ''}
-            </p>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate text-[22px] font-bold text-[#1E1E1E] leading-snug">{myNick || '—'}</p>
+              {myPhone && (
+                <p className="truncate text-[14px] text-[#727272] mt-1">{fmtPhone(myPhone)}</p>
+              )}
+            </div>
             <button onClick={() => setEditPhone(true)}
-                    className="flex-shrink-0 h-[34px] px-3.5 rounded-lg bg-[#F5F5F5] text-[#222222] text-[12px] font-semibold">
-              수정
+                    aria-label="내 정보 수정"
+                    className="flex-shrink-0 mt-1 w-[34px] h-[34px] rounded-lg bg-[#F5F5F5] flex items-center justify-center active:bg-[#E8E4E2] transition-colors">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#222222" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 20h9" />
+                <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+              </svg>
             </button>
           </div>
         )}
@@ -211,23 +232,32 @@ export default function AccountSettingsPage() {
           )}
           {/* 맨 위가 '현재 배달 주소'다 — 메뉴 화면 상단에 뜨는 것도 이것이다.
               어느 걸 쓰는지 안 보이면 주소를 여러 개 둔 의미가 없다. */}
-          {addrs.map((a, i) => (
-            <div key={a.id} className={`rounded-xl px-3.5 py-3 flex items-center justify-between gap-3 ${
-              i === 0 ? 'border-[1.5px] border-[#1E1E1E] bg-[#FAFAFA]' : 'border border-[#D7D7D7]'
+          {addrs.map(a => (
+            <div key={a.id} className={`rounded-xl px-3.5 py-3 flex items-center justify-between gap-3 transition-colors ${
+              a.isDefault ? 'border-[1.5px] border-[#1E1E1E] bg-[#FAFAFA]' : 'border border-[#D7D7D7]'
             }`}>
+              {/* 현재 주소를 누르면 **수정**, 다른 주소를 누르면 **그걸로 전환**.
+                  주소를 여러 개 둘 수 있는데 고를 방법이 없으면 둔 의미가 없다.
+                  (수정은 현재 주소에서만 — 안 쓰는 주소를 고치는 일은 드물고,
+                   한 번 탭에 두 가지 뜻을 담으면 어느 쪽이 일어날지 예측이 안 된다) */}
               <button
                 type="button"
-                onClick={() => setEditAddr(a)}
-                className="min-w-0 flex-1 text-left"
+                onClick={() => (a.isDefault ? setEditAddr(a) : makeDefault(a))}
+                disabled={busy}
+                className="min-w-0 flex-1 text-left disabled:opacity-60"
               >
-                {i === 0 && (
-                  <span className="inline-block mb-1 text-[11px] font-bold rounded-md px-1.5 py-0.5 bg-ink text-white">
+                {a.isDefault ? (
+                  <span className="inline-block mb-2 text-[11px] font-bold rounded-md px-1.5 py-0.5 bg-ink text-white">
                     현재 배달 주소
+                  </span>
+                ) : (
+                  <span className="inline-block mb-2 text-[11px] font-bold rounded-md px-1.5 py-0.5 bg-[#F2F2F2] text-[#727272]">
+                    눌러서 여기로 받기
                   </span>
                 )}
                 <p className="text-[14px] text-[#1E1E1E] leading-snug">{a.roadAddress}</p>
                 {a.detailAddress && (
-                  <p className="text-[13px] text-[#727272] leading-snug mt-1">{a.detailAddress}</p>
+                  <p className="text-[13px] text-[#727272] leading-snug mt-1.5">{a.detailAddress}</p>
                 )}
               </button>
               <button
@@ -243,8 +273,11 @@ export default function AccountSettingsPage() {
           <button
             onClick={() => setAddOpen(true)}
             disabled={busy}
-            className="w-full py-[12px] px-7 bg-ink text-white rounded-xl font-bold text-[15px] active:scale-95 transition-transform disabled:opacity-40"
+            className="w-full py-[12px] px-7 bg-ink text-white rounded-xl font-bold text-[15px] active:scale-95 transition-transform disabled:opacity-40 flex items-center justify-center gap-1.5"
           >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
             주소 추가
           </button>
         </div>

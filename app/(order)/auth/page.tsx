@@ -65,7 +65,6 @@ function AuthPageInner() {
             fontWeight: 500,
             color: '#222222',
             letterSpacing: '0.08em',
-            fontFamily: "'Pretendard Variable', Pretendard, sans-serif",
             marginTop: -18,
           }}>
             선결제 QR 오더

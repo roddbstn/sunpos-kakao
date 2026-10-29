@@ -110,6 +110,8 @@ export interface SunposAddress {
   detailAddress: string | null
   lat: number | null
   lng: number | null
+  /** 지금 쓰는 배달 주소인가 (사람당 하나) */
+  isDefault: boolean
 }
 
 // 도로명주소 → 좌표 (서버에서 네이버 지오코딩 수행)
@@ -127,7 +129,10 @@ export async function getSunposAddresses(): Promise<SunposAddress[]> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data } = await (supabase as any)
     .from('sunpos_user_addresses')
-    .select('id, road_address, detail_address, lat, lng')
+    .select('id, road_address, detail_address, lat, lng, is_default')
+    // 기본 주소가 **늘 맨 위**. 그 다음은 넣은 순서.
+    // 전엔 created_at 하나로만 정렬해서 "가장 먼저 넣은 주소"가 곧 현재 주소였다.
+    .order('is_default', { ascending: false })
     .order('created_at', { ascending: true })
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (data ?? []).map((r: any) => ({
@@ -136,7 +141,21 @@ export async function getSunposAddresses(): Promise<SunposAddress[]> {
     detailAddress: r.detail_address,
     lat:           r.lat,
     lng:           r.lng,
+    isDefault:     !!r.is_default,
   }))
+}
+
+/**
+ * 이 주소를 '현재 배달 주소'로 — 끄고-켜기를 서버에서 한 번에 한다.
+ *
+ * 클라이언트에서 UPDATE 두 번으로 하면 사이에서 끊겼을 때 기본 주소가 0개가 되거나
+ * 유니크 인덱스(사람당 하나)에 걸려 실패한다.
+ */
+export async function setDefaultAddress(addressId: string): Promise<void> {
+  const supabase = getSupabaseClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any).rpc('set_default_address', { p_address_id: addressId })
+  if (error) throw error
 }
 
 // 새 주소 추가 — 10개 꽉 찼으면 needsConfirmation=true + oldestAddress 반환 (아직 저장 안 됨).

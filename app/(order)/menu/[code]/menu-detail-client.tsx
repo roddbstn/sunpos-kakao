@@ -8,7 +8,7 @@ import { getSupabaseClient } from '@/lib/supabase/client'
 import { formatWon, calcSubtotal, isLowBalance, isNegativeBalance } from '@/lib/utils'
 import { track } from '@/lib/firebase'
 import { ampTrack } from '@/lib/amplitude'
-import type { Menu, SelectedOption } from '@/lib/types'
+import type { Menu, SelectedOption, EntrySource } from '@/lib/types'
 import OptionGroup from '@/components/menu/option-group'
 import { mapDbMenu } from '@/lib/mappers'
 import LoadingTimer from '@/components/ui/loading-timer'
@@ -18,6 +18,13 @@ export default function MenuDetailClient({ code }: { code: string }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const editCartId = searchParams.get('edit')   // 장바구니 수정 모드
+
+  // 이 상세 화면에 **어느 목록에서** 들어왔나 — recent(지난주문) / search(검색) / list(일반 메뉴판).
+  // 담기 이벤트에 실어야 '지난주문 클릭 → 담기'와 '메뉴판 클릭 → 담기'를 가를 수 있다.
+  // 모르는 값이 URL 로 들어와도 집계가 오염되지 않도록 아는 값만 통과시킨다.
+  const fromParam = searchParams.get('from')
+  const entrySource: EntrySource =
+    fromParam === 'recent' || fromParam === 'search' || fromParam === 'list' ? fromParam : 'direct'
 
   const account    = useSessionStore(s => s.account)
   const addItem    = useCartStore(s => s.addItem)
@@ -168,9 +175,9 @@ export default function MenuDetailClient({ code }: { code: string }) {
       updateItem(editCartId, qty, selectedOptions)
       router.push('/cart')
     } else {
-      addItem(menu.code, menu.name, menu.price, qty, selectedOptions, menu.imageUrl)
-      track('add_to_cart', { item_name: menu.name, price: menu.price, quantity: qty, value: subtotal, currency: 'KRW' })
-      ampTrack('add_to_cart', { menu_name: menu.name, price: menu.price, quantity: qty })
+      addItem(menu.code, menu.name, menu.price, qty, selectedOptions, menu.imageUrl, entrySource)
+      track('add_to_cart', { item_name: menu.name, price: menu.price, quantity: qty, value: subtotal, currency: 'KRW', entry_source: entrySource })
+      ampTrack('add_to_cart', { menu_name: menu.name, price: menu.price, quantity: qty, entry_source: entrySource })
       router.refresh()  // /menu 라우터 캐시 무효화 → 장바구니 바 즉시 반영
       router.back()
     }

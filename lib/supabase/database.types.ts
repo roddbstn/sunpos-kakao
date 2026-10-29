@@ -765,46 +765,176 @@ export type Database = {
           },
         ]
       }
+      store_leads: {
+        Row: {
+          created_at: string
+          from_account_code: string | null
+          from_store_id: string | null
+          id: string
+          lat: number | null
+          lng: number | null
+          matched_store_id: string | null
+          memo: string | null
+          notified_at: string | null
+          notify_consent: boolean
+          phone: string | null
+          place_id: string | null
+          reported_by: string
+          road_address: string | null
+          status: string
+          store_name: string
+        }
+        Insert: {
+          created_at?: string
+          from_account_code?: string | null
+          from_store_id?: string | null
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          matched_store_id?: string | null
+          memo?: string | null
+          notified_at?: string | null
+          notify_consent?: boolean
+          phone?: string | null
+          place_id?: string | null
+          reported_by: string
+          road_address?: string | null
+          status?: string
+          store_name: string
+        }
+        Update: {
+          created_at?: string
+          from_account_code?: string | null
+          from_store_id?: string | null
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          matched_store_id?: string | null
+          memo?: string | null
+          notified_at?: string | null
+          notify_consent?: boolean
+          phone?: string | null
+          place_id?: string | null
+          reported_by?: string
+          road_address?: string | null
+          status?: string
+          store_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_leads_from_account_code_fkey"
+            columns: ["from_account_code"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["account_code"]
+          },
+          {
+            foreignKeyName: "store_leads_from_store_id_fkey"
+            columns: ["from_store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_leads_matched_store_id_fkey"
+            columns: ["matched_store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stores: {
         Row: {
-          address: string | null
+          address: string
+          address_detail: string | null
           auto_open_enabled: boolean
           break_time: Json | null
           client_id: string
           created_at: string
+          customer_types: string[]
+          delivery_tip_base_distance_m: number | null
+          delivery_tip_base_fee: number | null
+          delivery_tip_tier_distance_m: number | null
+          delivery_tip_tier_fee: number | null
           id: string
           is_open: boolean
+          lat: number | null
+          lng: number | null
+          menu_category_text_size: string
+          menu_display_mode: string
+          menu_item_count_visible: boolean
+          menu_item_image_visible: boolean
+          menu_name_text_size: string
           name: string
+          onboarding_completed: boolean
           operating_hours: Json | null
           phone: string | null
+          regular_holidays: Json | null
+          representative_name: string | null
+          road_address: string | null
           today_override: Json | null
           updated_at: string
         }
         Insert: {
-          address?: string | null
+          address: string
+          address_detail?: string | null
           auto_open_enabled?: boolean
           break_time?: Json | null
           client_id: string
           created_at?: string
+          customer_types?: string[]
+          delivery_tip_base_distance_m?: number | null
+          delivery_tip_base_fee?: number | null
+          delivery_tip_tier_distance_m?: number | null
+          delivery_tip_tier_fee?: number | null
           id?: string
           is_open?: boolean
+          lat?: number | null
+          lng?: number | null
+          menu_category_text_size?: string
+          menu_display_mode?: string
+          menu_item_count_visible?: boolean
+          menu_item_image_visible?: boolean
+          menu_name_text_size?: string
           name: string
+          onboarding_completed?: boolean
           operating_hours?: Json | null
           phone?: string | null
+          regular_holidays?: Json | null
+          representative_name?: string | null
+          road_address?: string | null
           today_override?: Json | null
           updated_at?: string
         }
         Update: {
-          address?: string | null
+          address?: string
+          address_detail?: string | null
           auto_open_enabled?: boolean
           break_time?: Json | null
           client_id?: string
           created_at?: string
+          customer_types?: string[]
+          delivery_tip_base_distance_m?: number | null
+          delivery_tip_base_fee?: number | null
+          delivery_tip_tier_distance_m?: number | null
+          delivery_tip_tier_fee?: number | null
           id?: string
           is_open?: boolean
+          lat?: number | null
+          lng?: number | null
+          menu_category_text_size?: string
+          menu_display_mode?: string
+          menu_item_count_visible?: boolean
+          menu_item_image_visible?: boolean
+          menu_name_text_size?: string
           name?: string
+          onboarding_completed?: boolean
           operating_hours?: Json | null
           phone?: string | null
+          regular_holidays?: Json | null
+          representative_name?: string | null
+          road_address?: string | null
           today_override?: Json | null
           updated_at?: string
         }

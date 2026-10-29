@@ -6,7 +6,7 @@ import { useSessionStore } from '@/lib/store/session'
 import RecentMenus from '@/components/menu/recent-menus'
 import { useCartStore } from '@/lib/store/cart'
 import { getSupabaseClient } from '@/lib/supabase/client'
-import { formatWon, isLowBalance, isNegativeBalance, shortRoadAddress } from '@/lib/utils'
+import { formatWon, isLowBalance, isNegativeBalance, shortRoadAddress, entrySourceBreakdown } from '@/lib/utils'
 import MenuCard from '@/components/menu/menu-card'
 import { track } from '@/lib/firebase'
 import { ampTrack } from '@/lib/amplitude'
@@ -53,7 +53,12 @@ function MenuPageInner() {
       if (!alive) return
       if (!user) { setAuthState('anon'); return }
       setKakaoNick(user.nickname ?? '')
-      const profile = await getSunposProfile()
+      // profile 과 links 는 서로를 기다릴 이유가 없다. 전엔 순서대로 await 해서
+      // 왕복 두 번이 직렬로 쌓였다(실측 ~250ms). 같이 쏘고 같이 받는다.
+      const [profile, links] = await Promise.all([
+        getSunposProfile(),
+        account?.storeId ? getUserStoreLinks(account.storeId).catch(() => []) : Promise.resolve([]),
+      ])
       if (!alive) return
 
       // ⚠️ 등록 여부는 **계정별**이다.
@@ -61,10 +66,6 @@ function MenuPageInner() {
       // A계정에 등록한 사람이 B계정 QR 로 들어와도 'ready' 가 됐다. 그래서 톱니가
       // 보이고, 설정 화면은 계정별 링크를 확인하니 "이 계정의 이용자가 아니에요"로
       // 거부했다 — 들어온 사람 입장에선 로그인은 됐는데 설정만 막히는 모양이었다.
-      const links = account?.storeId
-        ? await getUserStoreLinks(account.storeId).catch(() => [])
-        : []
-      if (!alive) return
       const linked = links.some(l => l.account_code === account?.code && l.status === 'approved')
 
       if (profile?.phone && linked) {
@@ -207,6 +208,8 @@ function MenuPageInner() {
     // 맨 위에 저장된 주소가 '현재 배달 주소'다. 전엔 마지막 **주문**의 주소를 썼는데,
     // 설정에서 주소를 바꿔도 다음 주문 전까진 옛 주소가 계속 떠 있었다.
     getSunposAddresses()
+      // list[0] 은 **기본 주소**다 — getSunposAddresses 가 is_default 를 맨 앞으로 정렬한다.
+      // 설정 화면에서 주소를 바꾸면 여기 상단 표시도 같이 따라온다.
       .then(list => { if (!cancelled) setLastDeliveryAddress(list[0] ?? null) })
       .catch(() => { if (!cancelled) setLastDeliveryAddress(null) })
     return () => { cancelled = true }
@@ -221,43 +224,24 @@ function MenuPageInner() {
       try {
         const supabase = getSupabaseClient()
 
-        let catQuery = supabase
-          .from('categories')
-          .select('id, name, display_order')
-          .eq('is_active', true)
-          .order('display_order', { ascending: true })
-        if (account?.storeId) catQuery = catQuery.eq('store_id', account.storeId)
-        const { data: catData, error: catError } = await catQuery
-        if (catError) throw catError
+        // 카테고리 + 메뉴를 **한 번에** 받는다. 전엔 categories 를 받아야 그 id 로
+        // menus 를 칠 수 있어서 왕복이 반드시 두 번이었다(실측 82ms + 48ms, 직렬).
+        // RPC 는 SECURITY INVOKER 라 RLS 가 그대로 적용되고, 반환 모양도 기존
+        // PostgREST 중첩 결과와 같아서 mapDbMenu 를 고칠 필요가 없다.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: board, error: boardError } = await (supabase as any)
+          .rpc('qr_menu_board', { p_store_id: account?.storeId ?? null })
+        if (boardError) throw boardError
 
-        if (!catData || catData.length === 0) {
-          return
-        }
+        const catData = (board?.categories ?? []) as { id: string; name: string }[]
+        if (catData.length === 0) return
 
-        const cats: Category[] = catData.map((c) => ({ id: c.id, name: c.name }))
+        const cats: Category[] = catData.map(c => ({ id: c.id, name: c.name }))
         setCategories(cats)
         setActiveCategory(cats[0].id)
 
-        const catIds = cats.map(c => c.id)
-        const { data: menuData, error: menuError } = await supabase
-          .from('menus')
-          .select(`
-            id, category_id, name, description, base_price, image_url,
-            is_popular, is_recommended, is_new, is_sold_out, is_hidden, display_order,
-            menu_option_groups (
-              display_order,
-              option_groups (
-                id, name, is_required, is_multi, max_select, is_sold_out, is_hidden,
-                option_items ( id, name, extra_price, is_sold_out, is_hidden, display_order )
-              )
-            )
-          `)
-          .in('category_id', catIds)
-          .eq('is_hidden', false)
-          .order('display_order', { ascending: true })
-        if (menuError) throw menuError
-
-        setMenus((menuData ?? []).map(mapDbMenu))
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setMenus(((board?.menus ?? []) as any[]).map(mapDbMenu))
       } catch {
         setFetchError(true)
       } finally {
@@ -611,7 +595,9 @@ function MenuPageInner() {
                 track('recent_menu_top_click', payload)
                 ampTrack('recent_menu_top_click', payload)
               }
-              router.push(`/menu?item=${menu.code}`)
+              // ?from= 은 상세 화면의 add_to_cart 가 '어느 목록에서 들어왔는지'를 알기 위한 것.
+              // 클릭 시점엔 아는 정보인데 상세는 오버레이라 컴포넌트가 달라서, URL 로 넘긴다.
+              router.push(`/menu?item=${menu.code}&from=recent`)
             }}
           />
         )}
@@ -648,7 +634,7 @@ function MenuPageInner() {
                         categoryClickCountRef.current = 0
                         track('menu_card_click', { menu_name: menu.name, menu_code: menu.code, scroll_pct: scrollPct, category_click_count: catClicks })
                         ampTrack('menu_card_click', { menu_name: menu.name, menu_code: menu.code, scroll_pct: scrollPct, category_click_count: catClicks })
-                        router.push(`/menu?item=${menu.code}`)
+                        router.push(`/menu?item=${menu.code}&from=list`)
                       }}
                     />
                   ))}
@@ -732,7 +718,14 @@ function MenuPageInner() {
           style={{ boxShadow: '0 -4px 20px rgba(0,0,0,0.08)' }}
         >
           <button
-            onClick={() => { track('cart_bar_click', { item_count: qty }); ampTrack('cart_bar_click', { item_count: qty }); router.push('/cart') }}
+            onClick={() => {
+              // 담긴 항목의 유입 경로 구성비를 같이 보낸다 — 담기→주문 기여도를 재려면
+              // 이 단계부터 경로가 안 끊겨야 한다.
+              // item_count 는 이 이벤트에서 예전부터 **총 수량**(qty)이라 그 의미를 유지한다.
+              const p = { ...entrySourceBreakdown(cartItems), item_count: qty }
+              track('cart_bar_click', p); ampTrack('cart_bar_click', p)
+              router.push('/cart')
+            }}
             className="w-full py-[16px] bg-[#2C261F] text-white rounded-xl font-bold text-[15px] flex items-center justify-between px-5"
           >
             <span className="bg-black/10 rounded-lg px-2 py-0.5 text-[13px]">{qty}개</span>
@@ -889,7 +882,7 @@ function MenuPageInner() {
                               track('search_menu_click', sp)
                               ampTrack('search_menu_click', sp)
                               setSearchOpen(false)
-                              router.push(`/menu?item=${menu.code}`)
+                              router.push(`/menu?item=${menu.code}&from=search`)
                             }}
                           />
                         ))}

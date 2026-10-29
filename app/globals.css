@@ -263,3 +263,44 @@ button:active {
   font-family: 'Pretendard Variable', Pretendard, -apple-system, 'Apple SD Gothic Neo', sans-serif;
   font-variant-numeric: tabular-nums;   /* 숫자 폭 고정 — 초 단위로 바뀌어도 안 흔들린다 */
 }
+
+/* ── 준비 완료 아이콘들의 움직임 ─────────────────────────────────────────────
+   끝난 상태라고 멈춰 있으면 화면이 죽은 것처럼 보인다. 다만 '기다리는 중'(영수증
+   펄럭임·팬 흔들림)보다는 **작고 느리게** 움직인다 — 여기서 재촉할 일은 없다. */
+
+/* 오토바이 — 달리는 느낌. 위아래로 살짝 들썩이며 앞으로 기운다 */
+@keyframes moto-ride {
+  0%, 100% { transform: translateY(0)      rotate(0deg); }
+  25%      { transform: translateY(-0.9px) rotate(-1.6deg); }
+  60%      { transform: translateY(0.6px)  rotate(1deg); }
+}
+.moto-ride { animation: moto-ride 0.7s ease-in-out infinite; transform-origin: 70% 80%; }
+
+/* 뒤로 흐르는 속도선 — 세 줄기가 차례로 지나간다 */
+@keyframes speed-dash {
+  0%   { opacity: 0;    transform: translateX(3px); }
+  35%  { opacity: 0.85; }
+  100% { opacity: 0;    transform: translateX(-6px); }
+}
+.speed > * { animation: speed-dash 0.75s linear infinite; }
+.speed > *:nth-child(2) { animation-delay: 0.18s; }
+.speed > *:nth-child(3) { animation-delay: 0.36s; }
+
+/* 쟁반 덮개 — 들었다 놓는다. '차려 나온다'는 몸짓이다 */
+@keyframes tray-lift {
+  0%, 100% { transform: translateY(0); }
+  40%      { transform: translateY(-1.6px); }
+}
+.tray-lift { animation: tray-lift 1.9s ease-in-out infinite; }
+
+/* 봉투 — 손잡이에 걸려 흔들린다. 축이 손잡이(위쪽 가운데)다 */
+@keyframes bag-swing {
+  0%, 100% { transform: rotate(-2.2deg); }
+  50%      { transform: rotate(2.2deg); }
+}
+.bag-swing { animation: bag-swing 2s ease-in-out infinite; transform-origin: 50% 12%; }
+
+@media (prefers-reduced-motion: reduce) {
+  .moto-ride, .tray-lift, .bag-swing { animation: none; }
+  .speed > * { animation: none; opacity: 0.5; }
+}

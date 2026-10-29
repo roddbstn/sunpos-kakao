@@ -558,6 +558,19 @@ function SuccessPageInner() {
   const progress = hasTimer ? Math.min(1, 1 - secondsLeft! / totalSeconds!) : 0
   const timerDone = hasTimer && secondsLeft === 0
 
+  /**
+   * 출발한 지 몇 분 지났나 — "N분 전 출발".
+   *
+   * 분이 바뀌면 글자도 바뀌어야 해서 30초마다 다시 그린다. 1초마다 돌릴 이유는
+   * 없다(분 단위라 티도 안 난다). 배달이고 출발했을 때만 돈다.
+   */
+  const [, forceTick] = useState(0)
+  useEffect(() => {
+    if (!departedAt) return
+    const id = setInterval(() => forceTick(n => n + 1), 30_000)
+    return () => clearInterval(id)
+  }, [departedAt])
+
   // ── 주문 생성 중 ──────────────────────────────────────────────────────
   //
   // 스피너는 **주문 RPC 가 아직 안 끝났을 때만** 띄운다.
@@ -612,6 +625,11 @@ function SuccessPageInner() {
     )
   }
 
+  // 미리보기에서는 '7분 전 출발'이 보이도록 출발 시각을 가짜로 둔다
+  const previewDepartedAt = previewReadyMethod === '배달'
+    ? new Date(Date.now() - 7 * 60_000).toISOString()
+    : null
+
   const isReady = previewReadyMethod !== null || posCompleted || timerDone
   const method = previewReadyMethod ?? orderMethod
   const isDelivery = method === '배달'
@@ -640,9 +658,15 @@ function SuccessPageInner() {
     : method === '내점' ? 'dinein'
     : 'takeout'
 
+  /** 출발한 지 몇 분. departedAt 이 없으면 null */
+  const departedShownAt = departedAt ?? previewDepartedAt
+  const departedMinsAgo = departedShownAt
+    ? Math.max(0, Math.floor((Date.now() - new Date(departedShownAt).getTime()) / 60_000))
+    : null
+
   const statusLabel =
     statusKind === 'waiting'  ? '주문을 확인하고 있어요'
-    : statusKind === 'cooking' ? '음식이 준비중이에요'
+    : statusKind === 'cooking' ? '음식을 준비중이에요'
     : statusKind === 'delivery' ? '배달 라이더가 출발했어요'
     : statusKind === 'dinein'   ? '음식이 다 준비됐어요!'
     : '포장이 다 준비됐어요!'
@@ -658,27 +682,32 @@ function SuccessPageInner() {
             그라디언트 배너에 주문번호를 또 크게 박아 넣어서, 아래 주문번호 줄과
             같은 숫자가 두 번 나왔다. 틀이 하나면 상태가 바뀌어도 눈이 같은 자리를 본다.
 
-            준비 완료는 글자를 초록으로 — 기다리는 상태(검정)와 끝난 상태를
-            색 하나로 가른다. 점 세 개도 그때는 붙이지 않는다(더 기다릴 게 없다). */}
-        <div className="flex items-center justify-between gap-3">
-          <p className={`text-[23px] font-bold leading-snug tracking-tight ${
-            isReady ? 'text-[#017333]' : 'text-[#1E1E1E]'
-          }`}>
-            {isReady ? statusLabel : <WaitingLabel label={statusLabel} />}
-          </p>
-          <StatusBadge kind={statusKind} />
-        </div>
+            글자는 **어느 상태든 검정**이다. 준비 완료만 초록으로 해봤는데, 바로 아래
+            주문번호가 이미 초록이라 둘이 한 덩어리로 뭉쳐 보였다. 상태는 그림이 말한다.
 
-        {/* 받는 방법 한 줄 — 준비 완료일 때만. 전엔 초록 배너 안에 있던 정보다 */}
-        {isReady && (
-          <p className="text-[13px] text-[#727272] leading-relaxed">
-            {isDelivery
-              ? (departedAt
-                  ? `${new Date(departedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })}에 출발했어요. 곧 도착해요`
-                  : '곧 도착해요')
-              : '매장에서 주문번호를 보여주고 받아가세요'}
-          </p>
-        )}
+            머리와 서브텍스트를 한 묶음으로 감싼다 — 바깥 space-y-4(16px)가 둘 사이에
+            끼면 서브텍스트가 다음 블록처럼 떨어져 보인다. */}
+        <div>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[23px] font-bold text-[#1E1E1E] leading-snug tracking-tight">
+              {isReady ? statusLabel : <WaitingLabel label={statusLabel} />}
+            </p>
+            <StatusBadge kind={statusKind} />
+          </div>
+
+          {/* 받는 방법 한 줄 — 준비 완료일 때만. 전엔 초록 배너 안에 있던 정보다.
+              13 → 14px. 이 줄이 "그래서 내가 뭘 해야 하나"를 말하는 유일한 문장이라
+              각주 크기로 두면 안 읽힌다. */}
+          {isReady && (
+            <p className="mt-[6px] text-[14px] text-[#727272] leading-relaxed">
+              {isDelivery
+                ? (departedMinsAgo === null ? '조금 전 출발'
+                   : departedMinsAgo === 0  ? '방금 출발'
+                   : `${departedMinsAgo}분 전 출발`)
+                : '매장에서 받아가세요'}
+            </p>
+          )}
+        </div>
 
         {/* ── 예상 대기시간 ──
             주문번호와 **자리를 바꿨다.** 손님이 이 화면에서 계속 보는 건 "얼마나

@@ -107,29 +107,37 @@ export function PanIcon({ size = 46 }: { size?: number }) {
 }
 
 /**
- * 배달 라이더 — 배달 출발.
+ * 오토바이 — 배달 출발.
  *
- * 옆에서 본 스쿠터 + 사람. 둘 중 하나만 그리면 뜻이 반쯤 빠진다 —
- * 스쿠터만 두면 '탈것', 사람만 두면 '직원'이다. 뒤에 배달통이 있어야 배달이 된다.
+ * 사람은 뺐다. 46px 에서 사람을 같이 그리면 머리·팔·몸이 선 몇 개로 뭉쳐서
+ * 오토바이 위의 얼룩처럼 보였다. 탈것 하나만 두는 쪽이 멀리서도 또렷하다.
+ * 배달이라는 뜻은 **배달통**이 맡는다 — 그게 없으면 그냥 오토바이다.
+ *
+ * 움직임: 달리듯 들썩이고, 뒤로 속도선이 흐른다.
  */
-export function RiderIcon({ size = 46 }: { size?: number }) {
+export function MotoIcon({ size = 46 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
-      {/* 배달통 — 뒤에 싣는다. 이게 없으면 그냥 오토바이다 */}
-      <path d="M2.6 9.6h5.2v4.2H2.6z" fill="#017333" fillOpacity="0.3" />
-      <path d="M2.6 9.6h5.2v4.2H2.6z" stroke="#017333" strokeWidth="1.4" strokeLinejoin="round" />
-      {/* 사람 — 머리 + 앞으로 기운 몸 + 핸들로 뻗은 팔 */}
-      <circle cx="11.4" cy="6.4" r="2" fill="#017333" />
-      <path d="M10.6 8.8l1.6 4.6" stroke="#017333" strokeWidth="1.7" strokeLinecap="round" />
-      <path d="M11.2 10.2l4.2-.4" stroke="#017333" strokeWidth="1.6" strokeLinecap="round" />
-      {/* 스쿠터 — 발판에서 앞 포크·핸들까지 */}
-      <path d="M7.2 17.4h4.4l2.8-4.6h2.4" stroke="#017333" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M14.6 9.6h3M16.8 9.8l.5 4.4" stroke="#017333" strokeWidth="1.5" strokeLinecap="round" />
-      {/* 바퀴 */}
-      <circle cx="5.2" cy="17.6" r="2.9" fill="#017333" fillOpacity="0.3" />
-      <circle cx="5.2" cy="17.6" r="2.9" stroke="#017333" strokeWidth="1.5" />
-      <circle cx="18.4" cy="17.6" r="2.9" fill="#017333" fillOpacity="0.3" />
-      <circle cx="18.4" cy="17.6" r="2.9" stroke="#017333" strokeWidth="1.5" />
+      {/* 속도선 — 오토바이 뒤(왼쪽)에서 흐른다 */}
+      <g className="speed" stroke="#017333" strokeWidth="1.4" strokeLinecap="round" opacity="0.5">
+        <path d="M1.4 9.6h3" />
+        <path d="M0.8 12.4h2.4" />
+        <path d="M1.8 15.2h2.6" />
+      </g>
+      <g className="moto-ride">
+        {/* 배달통 */}
+        <path d="M5.4 7.8h5v4.4h-5z" fill="#017333" fillOpacity="0.3" />
+        <path d="M5.4 7.8h5v4.4h-5z" stroke="#017333" strokeWidth="1.5" strokeLinejoin="round" />
+        {/* 몸체 — 뒷바퀴에서 발판·앞 포크로 */}
+        <path d="M8 17.4h4l3-5h2.6" stroke="#017333" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+        {/* 핸들 */}
+        <path d="M14.4 10.6h3.4M17.2 10.8l.6 4" stroke="#017333" strokeWidth="1.6" strokeLinecap="round" />
+        {/* 바퀴 */}
+        <circle cx="6" cy="17.6" r="3" fill="#017333" fillOpacity="0.3" />
+        <circle cx="6" cy="17.6" r="3" stroke="#017333" strokeWidth="1.6" />
+        <circle cx="18.4" cy="17.6" r="3" fill="#017333" fillOpacity="0.3" />
+        <circle cx="18.4" cy="17.6" r="3" stroke="#017333" strokeWidth="1.6" />
+      </g>
     </svg>
   )
 }
@@ -144,12 +152,14 @@ export function RiderIcon({ size = 46 }: { size?: number }) {
 export function TrayIcon({ size = 46 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
-      {/* 덮개 손잡이 */}
+      <g className="tray-lift">
+      {/* 덮개 손잡이 — 덮개와 함께 들린다(쟁반은 가만히 있어야 '들어올린' 것으로 보인다) */}
       <path d="M12 6.4v1.6" stroke="#017333" strokeWidth="1.6" strokeLinecap="round" />
       <circle cx="12" cy="5.6" r="1.1" fill="#017333" />
       {/* 덮개 — 반원을 채운다 */}
       <path d="M5.4 14.6a6.6 6.6 0 0 1 13.2 0Z" fill="#017333" fillOpacity="0.3" />
       <path d="M5.4 14.6a6.6 6.6 0 0 1 13.2 0" stroke="#017333" strokeWidth="1.6" strokeLinejoin="round" />
+      </g>
       {/* 쟁반 — 덮개보다 넓게. 같은 폭이면 덮개 바닥선으로만 보인다 */}
       <path d="M3 15.2h18" stroke="#017333" strokeWidth="2" strokeLinecap="round" />
       <path d="M5.6 17.6h12.8" stroke="#017333" strokeWidth="1.5" strokeLinecap="round" opacity="0.45" />
@@ -165,7 +175,7 @@ export function TrayIcon({ size = 46 }: { size?: number }) {
  */
 export function BagIcon({ size = 46 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden className="bag-swing">
       {/* 손잡이 */}
       <path d="M9.2 8.4a2.8 2.8 0 0 1 5.6 0" stroke="#017333" strokeWidth="1.5" strokeLinecap="round" />
       {/* 몸통 */}
@@ -196,9 +206,11 @@ export type StatusKind = 'waiting' | 'cooking' | 'delivery' | 'dinein' | 'takeou
 
 export function StatusBadge({ kind }: { kind: StatusKind }) {
   const Icon = kind === 'cooking'  ? PanIcon
-             : kind === 'delivery' ? RiderIcon
+             : kind === 'delivery' ? MotoIcon
              : kind === 'dinein'   ? TrayIcon
              : kind === 'takeout'  ? BagIcon
              : ReceiptIcon
-  return <div className="flex-shrink-0"><Icon /></div>
+  // mr — 아이콘을 오른쪽 끝에서 살짝 들여놓는다. 화면 가장자리에 붙어 있으면
+  // 잘린 것처럼 보이고, 움직이는 아이콘은 특히 그렇다.
+  return <div className="flex-shrink-0 mr-[6px]"><Icon /></div>
 }

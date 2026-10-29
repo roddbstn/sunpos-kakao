@@ -255,3 +255,11 @@ button:active {
   .pan-toss          { animation: none; }
   .steam > *         { animation: none; opacity: 0.6; }
 }
+
+/* Pretendard 를 쓰는 자리 — 기본 폰트는 그대로 두고 필요한 곳에만 건다.
+   전역으로 바꾸지 않는 이유: 나머지 화면이 전부 시스템 폰트 기준으로 자간·줄높이가
+   맞춰져 있어서, 통째로 갈면 레이아웃이 미세하게 전부 어긋난다. */
+.font-pretendard {
+  font-family: 'Pretendard Variable', Pretendard, -apple-system, 'Apple SD Gothic Neo', sans-serif;
+  font-variant-numeric: tabular-nums;   /* 숫자 폭 고정 — 초 단위로 바뀌어도 안 흔들린다 */
+}

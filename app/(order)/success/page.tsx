@@ -575,7 +575,9 @@ function SuccessPageInner() {
 
   return (
     <div className="screen" style={{ paddingBottom: showReview ? '80px' : '0' }}>
-      <div className="flex-1 overflow-y-auto px-4 pt-8 pb-6 space-y-4">
+      {/* pt-8 → pt-14. 상태 문구가 화면 맨 위에 바짝 붙어 있었다.
+          노치·상태바 아래 첫 줄이라 숨 쉴 자리가 필요하다. */}
+      <div className="flex-1 overflow-y-auto px-4 pt-14 pb-6 space-y-4">
 
         {/* 타이틀 */}
         {isReady ? (
@@ -655,15 +657,19 @@ function SuccessPageInner() {
 
         {/* ── 주문번호 ──
             박스를 걷어냈다. 테두리·배경이 있으면 주변 카드들과 같은 격으로 읽혀서
-            "이것도 정보 묶음 하나"가 된다. 번호는 **번호만** 크게 보이면 된다.
-            가운데 정렬 — 매장에서 보여줄 때 화면을 돌려 내밀는 숫자다. */}
+            "이것도 정보 묶음 하나"가 된다. 번호는 **번호만** 보이면 된다.
+
+            라벨을 숫자 **왼쪽**에 두고 색·크기·글꼴을 똑같이 맞췄다. 위아래로
+            쌓고 크기를 달리 하면 '제목 + 값'이 되어 두 번 읽게 되는데,
+            '주문번호 042' 는 한 덩어리로 한 번에 읽히는 말이다.
+
+            Pretendard 를 쓰는 이유: 시스템 한글 폰트는 기기마다 숫자 폭과 한글
+            높이가 달라서, 한 줄에 선 '주문번호'와 '042' 의 밑선이 아이폰과
+            안드로이드에서 다르게 맞는다. */}
         {(orderNumber ?? orderCode) && (
-          <div className="text-center pt-1">
-            <p className="text-[12px] font-normal text-[#727272]">주문번호</p>
-            <p className="font-mono font-extrabold text-[#017333] text-[40px] tracking-widest leading-none mt-1">
-              {orderNumber ?? orderCode}
-            </p>
-          </div>
+          <p className="font-pretendard text-center text-[22px] font-semibold text-[#017333] tracking-tight">
+            주문번호 {orderNumber ?? orderCode}
+          </p>
         )}
 
         {/* 다른 선결제 가게 제보 — 주문번호 바로 아래.

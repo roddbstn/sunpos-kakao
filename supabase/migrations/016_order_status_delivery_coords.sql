@@ -34,7 +34,10 @@ returns table(
   delivery_lat            double precision,
   delivery_lng            double precision,
   delivery_road_address   text,
-  delivery_detail_address text
+  delivery_detail_address text,
+  -- 매장 좌표도 여기서 준다 (2026-10-30 추가)
+  store_lat               double precision,
+  store_lng               double precision
 )
 language sql
 stable
@@ -43,11 +46,21 @@ set search_path to 'public', 'extensions'
 as $fn$
   select o.status::text, o.note, o.delivery_departed_at, o.method,
          o.delivery_lat, o.delivery_lng,
-         o.delivery_road_address, o.delivery_detail_address
+         o.delivery_road_address, o.delivery_detail_address,
+         s.lat, s.lng
   from orders o
+  left join accounts a on a.account_code = o.account_code
+  left join stores   s on s.id = a.store_id
   where o.order_code = p_order_code;
 $fn$;
 
 -- 권한은 바꾸지 않는다 — 원래대로 둔다(두 QR웹이 로그인 전에도 부른다)
 revoke execute on function public.get_order_status(uuid) from public;
 grant  execute on function public.get_order_status(uuid) to anon, authenticated, service_role;
+
+-- ── 매장 좌표를 뒤늦게 더한 이유 (2026-10-30) ──────────────────────────────
+-- 배달 지도가 **실제 주문에서 안 떴다.** 배달 주소는 보이는데 지도만 없었다.
+-- 원인은 매장 좌표를 account.storeId 로 stores 에서 따로 조회하고 있었던 것:
+--   · storeId 는 세션(zustand)에 들어 있고 Account.storeId 는 optional 이다
+--   · 그 값이 안 채워진 경로로 들어오면 매장 좌표가 영영 null → 지도 자체가 안 뜬다
+-- 지도가 세션 상태에 좌우될 이유가 없다. 주문 하나면 양쪽 좌표를 다 알 수 있다.

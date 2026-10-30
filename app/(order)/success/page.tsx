@@ -603,6 +603,16 @@ function SuccessPageInner() {
     const addr = [d.delivery_road_address, d.delivery_detail_address]
       .filter(Boolean).join(' ').trim()
     if (addr) setDestAddress(prev => prev || addr)
+    // 매장 좌표도 **주문에서** 받는다.
+    //
+    // 전엔 account.storeId 로 stores 를 따로 조회했는데, 그 값은 세션(zustand)에
+    // 들어 있고 Account.storeId 는 optional 이다. 세션이 비거나 그 필드가 안 채워진
+    // 경로로 들어오면 매장 좌표가 영영 null 이라 **지도 자체가 안 떴다**
+    // (배달 주소는 보이는데 지도만 없는 상태 — 실제 주문에서 그랬다).
+    // 지도가 세션 상태에 좌우될 이유가 없다. 주문 하나면 다 알 수 있다.
+    if (d.store_lat != null && d.store_lng != null) {
+      setStoreLoc(prev => prev ?? { lat: Number(d.store_lat), lng: Number(d.store_lng) })
+    }
   }, [])
 
   // ── Accepted ──────────────────────────────────────────────────────────

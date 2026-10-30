@@ -75,7 +75,7 @@ export default function DeliveryMap({
         const b = new kakao.maps.LatLng(dest.lat, dest.lng)
 
         pin(kakao, map, a, '매장', '#1E1E1E')
-        pin(kakao, map, b, '배달지', '#16a84c')   // 소요시간 띠와 같은 초록
+        pin(kakao, map, b, '도착 장소', '#16a84c')   // 소요시간 띠와 같은 초록
 
         // 두 점이 다 들어오게. 여백을 넉넉히 줘야 핀이 가장자리에 걸리지 않는다.
         // 위쪽을 더 비우는 건 소요시간 띠가 거기 앉기 때문이다.

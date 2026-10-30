@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useSessionStore } from '@/lib/store/session'
 import OtherStoreLeadButton from '@/components/OtherStoreLeadButton'
@@ -180,6 +180,7 @@ function SuccessPageInner() {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const d = Array.isArray(det) ? det[0] ?? null : null
               if (d?.delivery_departed_at) setDepartedAt(d.delivery_departed_at)
+              fillDelivery(d)
               if (row.status === '취소' && d?.note) {
                 setRejectedReason(d.note)
                 sessionStorage.setItem('last_order_rej_reason', d.note)
@@ -439,6 +440,7 @@ function SuccessPageInner() {
       const detail = Array.isArray(details) ? details[0] ?? null : null
 
       if (detail?.delivery_departed_at) setDepartedAt(detail.delivery_departed_at)
+      fillDelivery(detail)
       if (statusRow.status === '완료') {
         setStatus('accepted')
         setAcceptedAt(prev => {
@@ -581,6 +583,27 @@ function SuccessPageInner() {
         selectedOptions: [] },
     ]))
   }
+
+  /**
+   * get_order_status 가 돌려준 배달 정보로 지도를 채운다.
+   *
+   * 원래는 checkout 이 sessionStorage 에 남긴 값만 썼는데, sessionStorage 는
+   * **그 탭에서만** 산다 — 주문 링크를 문자로 받아 다른 기기에서 열거나 브라우저를
+   * 닫았다 열면 지도가 아예 안 떴다. 좌표는 orders 에 이미 있었고 가져올 길만
+   * 없었다(2026-10-30 에 RPC 에 컬럼을 붙였다).
+   *
+   * 이미 들어온 값이 있으면 덮지 않는다 — 세션 값이 더 빨리 도착한다.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const fillDelivery = useCallback((d: any) => {
+    if (!d) return
+    if (d.delivery_lat != null && d.delivery_lng != null) {
+      setDestLoc(prev => prev ?? { lat: Number(d.delivery_lat), lng: Number(d.delivery_lng) })
+    }
+    const addr = [d.delivery_road_address, d.delivery_detail_address]
+      .filter(Boolean).join(' ').trim()
+    if (addr) setDestAddress(prev => prev || addr)
+  }, [])
 
   // ── Accepted ──────────────────────────────────────────────────────────
   const hasTimer = totalSeconds !== null && secondsLeft !== null

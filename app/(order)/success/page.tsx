@@ -11,6 +11,7 @@ import { ampTrack } from '@/lib/amplitude'
 import type { CartItem } from '@/lib/types'
 import LoadingTimer from '@/components/ui/loading-timer'
 import { WaitingLabel, StatusBadge, type StatusKind } from '@/components/order/OrderStatusHeader'
+import DeliveryMap from '@/components/order/DeliveryMap'
 
 type OrderResultStatus = 'pending' | 'accepted' | 'rejected'
 
@@ -53,9 +54,26 @@ function SuccessPageInner() {
   const [showReview,       setShowReview]        = useState(false)
   /** 매장 좌표 — 가게 검색을 이 동네부터 보여주려고. 없어도 검색은 된다(전국). */
   const [storeLoc, setStoreLoc] = useState<{ lat: number; lng: number } | null>(null)
+  /** 배달 받을 곳 좌표 — 지도용. checkout 이 sessionStorage 에 남긴다 */
+  const [destLoc, setDestLoc] = useState<{ lat: number; lng: number } | null>(null)
+  /** 자동차 소요시간(초)·도로거리(m) — /api/route-eta */
+  const [eta, setEta] = useState<{ durationSec: number; distanceM: number } | null>(null)
+  /** 지도 아래 한 줄로 보여줄 배달 주소 */
+  const [destAddress, setDestAddress] = useState('')
 
   // 매장 좌표 한 번만. 실패하면 조용히 넘어간다 — 좌표 없이도 검색은 된다.
   useEffect(() => {
+    // 미리보기에는 세션이 없어서 storeId 가 없다 — 매장 좌표를 가짜로 둔다.
+    // (샐러리아 침산점 부근) 개발 환경에서만 동작한다.
+    if (!account?.storeId && process.env.NODE_ENV === 'development'
+        && new URLSearchParams(window.location.search).get('preview')) {
+      // ⚠️ 지어낸 좌표를 쓰지 말 것. 처음에 (35.8964, 128.6014) 를 대충 넣었다가
+      //    지도가 연암공원 쪽을 가리켜서 "매장 위치가 완전 잘못됐다"는 지적을 받았다.
+      //    아래는 stores 테이블의 실제 값이고, 카카오 주소검색으로 교차확인했다
+      //    (옥산로17길 14 → 35.8857762 / 128.5860190).
+      setStoreLoc({ lat: 35.8857676, lng: 128.5859752 })
+      return
+    }
     const sid = account?.storeId
     if (!sid) return
     let cancelled = false
@@ -288,6 +306,10 @@ function SuccessPageInner() {
     const orderer        = sessionStorage.getItem('last_order_orderer') ?? ''
     const phone          = sessionStorage.getItem('last_order_phone') ?? ''
     const acct           = sessionStorage.getItem('last_order_account') ?? ''
+    const dLat = sessionStorage.getItem('last_order_delivery_lat')
+    const dLng = sessionStorage.getItem('last_order_delivery_lng')
+    if (dLat && dLng) setDestLoc({ lat: Number(dLat), lng: Number(dLng) })
+    setDestAddress(sessionStorage.getItem('last_order_delivery_address') ?? '')
     const balanceBeforeRaw = sessionStorage.getItem('last_order_balance_before')
     const balanceAfterRaw  = sessionStorage.getItem('last_order_balance_after')
 
@@ -513,7 +535,9 @@ function SuccessPageInner() {
    * NODE_ENV 로 막아서 **배포본에는 아예 없다.** 번들러가 false 가지를 지운다.
    */
   const preview = process.env.NODE_ENV === 'development' ? searchParams.get('preview') : null
-  const previewCooking = preview === 'cooking'
+  // 'waiting-delivery' · 'cooking-delivery' — 배달 주문의 확인중/준비중을 본다.
+  // 지도가 그 두 상태에서도 떠야 해서 따로 둔다.
+  const previewCooking = preview === 'cooking' || preview === 'cooking-delivery'
   /** ?preview=ready-delivery · ready-dinein · ready-takeout */
   const previewReadyMethod =
     preview === 'ready-delivery' ? '배달'
@@ -538,11 +562,16 @@ function SuccessPageInner() {
     const S = sessionStorage
     S.setItem('last_order_code', '00000000-0000-0000-0000-0000000000aa')
     S.setItem('last_order_number', '042')
-    S.setItem('last_order_method', previewReadyMethod ?? '포장')
+    S.setItem('last_order_method', preview.includes('delivery') ? '배달' : (previewReadyMethod ?? '포장'))
     S.setItem('last_order_total', '24100')
     S.setItem('last_order_orderer', '김다현')
     S.setItem('last_order_phone', '010-1234-5678')
     S.setItem('last_order_account', '북구청 공원녹지과')
+    // 지도 미리보기 — 샐러리아 침산점 근처와 북구청. 실제 두 지점이라 거리가 현실적이다
+    // 실제 주소의 실제 좌표다(대학로 80 → 35.8890974 / 128.6143223, 카카오 주소검색).
+    S.setItem('last_order_delivery_lat', '35.8890974')
+    S.setItem('last_order_delivery_lng', '128.6143223')
+    S.setItem('last_order_delivery_address', '대구 북구 대학로 80 산학협력관 4층')
     S.setItem('last_order_balance_before', '319800')
     S.setItem('last_order_balance_after', '295700')
     S.setItem('last_order_items', JSON.stringify([
@@ -570,6 +599,26 @@ function SuccessPageInner() {
     const id = setInterval(() => forceTick(n => n + 1), 30_000)
     return () => clearInterval(id)
   }, [departedAt])
+
+  /**
+   * 자동차 소요시간 — 매장과 배달지 좌표가 둘 다 있을 때 한 번만 부른다.
+   *
+   * 실패해도 화면은 그대로 간다. 지도와 주소는 이미 보이고 있고, 소요시간은
+   * "있으면 좋은" 정보다 — 그것 때문에 화면이 비면 손해다.
+   */
+  useEffect(() => {
+    if (!storeLoc || !destLoc) return
+    let cancelled = false
+    const q = new URLSearchParams({
+      oLat: String(storeLoc.lat), oLng: String(storeLoc.lng),
+      dLat: String(destLoc.lat),  dLng: String(destLoc.lng),
+    })
+    fetch(`/api/route-eta?${q}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (!cancelled && d?.durationSec) setEta(d) })
+      .catch(() => { /* 소요시간은 없어도 된다 */ })
+    return () => { cancelled = true }
+  }, [storeLoc, destLoc])
 
   // ── 주문 생성 중 ──────────────────────────────────────────────────────
   //
@@ -754,9 +803,28 @@ function SuccessPageInner() {
                 '표 머리글'처럼 보인다 — 여기선 글자가 주인공이다. */}
             <span className="h-px flex-1 bg-[#EDEDED]" />
             <p className="font-pretendard text-[21px] font-semibold text-[#017333] tracking-[-0.01em] truncate max-w-full">
-              주문번호 <span className="ml-[2px]">{orderNumber ?? orderCode}</span>
+              {orderOrderer && `${orderOrderer}님 `}주문번호
+              <span className="ml-[2px]">{orderNumber ?? orderCode}</span>
             </p>
             <span className="h-px flex-1 bg-[#EDEDED]" />
+          </div>
+        )}
+
+        {/* ── 배달 지도 ──
+            배달 주문에만, '주문을 확인하고 있어요' 때부터 보여준다.
+            배달은 "내가 어디로 시켰더라"가 가장 불안한 지점이라, 주소 한 줄보다
+            점 두 개가 찍힌 그림이 훨씬 빨리 안심시킨다. 받는 방법이 정해진 뒤가
+            아니라 **처음부터** 보여야 하는 이유도 그것이다 — 주소를 잘못 넣었으면
+            점주가 접수하기 전에 알아차려야 한다.
+
+            좌표가 둘 다 있을 때만 그린다. 하나라도 없으면 지도가 엉뚱한 곳을
+            가리키므로 아예 안 그리는 게 낫다. */}
+        {isDelivery && storeLoc && destLoc && (
+          <div>
+            {/* 소요시간과 출발지는 **지도 안에** 얹는다. 밖에 한 줄로 두면 지도는
+                그냥 그림이 되고 글자는 각주가 되는데, 둘은 같은 이야기다.
+                지도 위에 있어야 "이 거리를 이만큼 걸려 온다"로 한 번에 읽힌다. */}
+            <DeliveryMap store={storeLoc} dest={destLoc} eta={eta} />
           </div>
         )}
 
@@ -799,6 +867,15 @@ function SuccessPageInner() {
                   ` (+${formatWon(orderDeliveryFee)}${orderDistanceM != null ? ` · ${formatDistance(orderDistanceM)}` : ''})`
                 ) : ''}
               </span>
+            </div>
+          )}
+          {/* 배달 주소는 **여기**가 자리다. 지도 밑에 한 줄로 두면 지도의 캡션처럼
+              읽히는데, 이건 주문의 사실 하나라 거래처·주문자·연락처와 같은 묶음에
+              있어야 한다. 배달이 아니면 보여줄 게 없다. */}
+          {isDelivery && destAddress && (
+            <div className="flex justify-between gap-4">
+              <span className="text-[#727272] flex-shrink-0">배달 주소</span>
+              <span className="font-normal text-[#222222] text-right">{destAddress}</span>
             </div>
           )}
           {orderBalanceBefore !== null && (

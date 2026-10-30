@@ -315,6 +315,13 @@ export default function CheckoutPage() {
     sessionStorage.setItem('last_order_pickup_minutes', pickupRequired && pickupMinutes !== null ? String(pickupMinutes) : '')
     sessionStorage.setItem('last_order_delivery_fee',   String(fee))
     sessionStorage.setItem('last_order_delivery_distance_m', deliveryDistanceM != null ? String(deliveryDistanceM) : '')
+    // 배달지 좌표 — 주문 완료 화면의 지도가 쓴다.
+    // orders 에도 들어가지만(p_delivery_lat/lng) get_order_status 가 돌려주지 않아서,
+    // 화면이 바로 쓸 수 있게 여기서도 남긴다.
+    sessionStorage.setItem('last_order_delivery_lat', deliveryLat != null ? String(deliveryLat) : '')
+    sessionStorage.setItem('last_order_delivery_lng', deliveryLng != null ? String(deliveryLng) : '')
+    sessionStorage.setItem('last_order_delivery_address',
+      [baseAddress.trim(), detailAddress.trim()].filter(Boolean).join(' '))
     sessionStorage.setItem('last_order_total',          String(total))
     sessionStorage.setItem('last_order_orderer',        finalOrderer)
     sessionStorage.setItem('last_order_phone',          finalPhone)
